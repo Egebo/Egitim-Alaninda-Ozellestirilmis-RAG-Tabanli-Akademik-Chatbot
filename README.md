@@ -1,4 +1,4 @@
-# Akademik RAG & Agentic Chatbot
+# Eğitim Alanında Özelleştirilmiş RAG Tabanlı Chatbot
 
 Gradio yerine modern web arayüzüyle çalışan yerel Flask uygulaması.
 
