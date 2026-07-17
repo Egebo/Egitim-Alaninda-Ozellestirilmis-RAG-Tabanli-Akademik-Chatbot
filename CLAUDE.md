@@ -1,14 +1,14 @@
-# Academic Chatbot — CLAUDE.md
+# Academic Chatbot CLAUDE.md
 
 Bitirme projesi: Üniversite akademik danışman chatbotu. LLM + RAG + Text-to-SQL mimarisi üzerine inşa edilmiştir. Tüm arayüz ve prompt'lar Türkçe'dir.
 
 ## Proje Özeti
 
-- **Backend:** `app.py` (~1100 satır) — tek dosya Flask uygulaması
-- **Frontend:** `templates/index.html` (~800 satır) — vanilla JS, koyu tema, 3 sütun layout
-- **Veritabanı:** `demo_okul.db` — SQLite, 7 tablo, demo akademik veri
-- **Vektör DB:** `chroma_db/` — Chroma, kalıcı, belgeler klasöründen besleniyor
-- **Yüklenen Belgeler:** `uploads/` — PDF, TXT, Excel
+- **Backend:** `app.py` (~1100 satır): tek dosya Flask uygulaması
+- **Frontend:** `templates/index.html` (~800 satır): vanilla JS, koyu tema, 3 sütun layout
+- **Veritabanı:** `demo_okul.db`: SQLite, 7 tablo, demo akademik veri
+- **Vektör DB:** `chroma_db/`: Chroma, kalıcı, belgeler klasöründen besleniyor
+- **Yüklenen Belgeler:** `uploads/`: PDF, TXT, Excel
 
 ## Çalıştırmak
 
@@ -59,7 +59,7 @@ python app.py
 
 - **Lazy loading:** ML kütüphaneleri ilk API isteğine kadar yüklenmez → hızlı başlangıç
 - **builtins injection:** Büyük modüller Python builtins'e kaydedilir, iç içe fonksiyonlarda tekrar import olmaz
-- **Monolitik backend:** Modüler değil, tek `app.py` — öğrenci projesi için kasıtlı basitlik
+- **Monolitik backend:** Modüler değil, tek `app.py`: öğrenci projesi için kasıtlı basitlik
 - **Bağlam penceresi:** Son 5 konuşma turu prompt'a eklenir
 
 ## API Endpoint'leri

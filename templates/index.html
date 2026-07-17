@@ -1259,7 +1259,7 @@ async function crawlSite() {
 
     if (data.ok) {
       renderDocList(data.documents);
-      toast(`✅ ${data.crawled} sayfa tarandı — ${data.doc_name}`, 'ok');
+      toast(`✅ ${data.crawled} sayfa tarandı: ${data.doc_name}`, 'ok');
       document.getElementById('crawlUrl').value = '';
     } else {
       toast('Hata: ' + data.error, 'err');

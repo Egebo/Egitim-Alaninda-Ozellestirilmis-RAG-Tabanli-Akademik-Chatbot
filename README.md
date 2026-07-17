@@ -4,12 +4,12 @@ Gradio yerine modern web arayüzüyle çalışan yerel Flask uygulaması.
 
 ## Özellikler
 
-- **Intent Routing** — DB_QUERY / SEARCH / META / GENERAL otomatik yönlendirme
-- **Text-SQL (Few-Shot RAG)** — Akademik veritabanına doğal dil sorguları
-- **Belge RAG** — PDF/XLSX yükleyip üzerinden soru sorma
-- **Web Crawler** — Herhangi bir siteyi tarayıp RAG'e ekleme
-- **Multi-conversation** — Birden fazla sohbet yönetimi
-- **Token & Maliyet takibi** — GPT-4o-mini ve Gemini Flash desteği
+- **Intent Routing:** DB_QUERY / SEARCH / META / GENERAL otomatik yönlendirme
+- **Text-SQL (Few-Shot RAG):** Akademik veritabanına doğal dil sorguları
+- **Belge RAG:** PDF/XLSX yükleyip üzerinden soru sorma
+- **Web Crawler:** Herhangi bir siteyi tarayıp RAG'e ekleme
+- **Multi-conversation:** Birden fazla sohbet yönetimi
+- **Token & Maliyet takibi:** GPT-4o-mini ve Gemini Flash desteği
 
 ## Kurulum
 
