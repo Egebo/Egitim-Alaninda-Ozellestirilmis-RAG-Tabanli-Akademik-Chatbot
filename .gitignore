@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# generated vector store (regenerate by re-ingesting documents)
+chroma_db/
+
+# uploaded demo documents (may contain personal data — do not commit)
+uploads/*
+!uploads/.gitkeep

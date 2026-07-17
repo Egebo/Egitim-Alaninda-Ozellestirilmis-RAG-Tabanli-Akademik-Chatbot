@@ -1,0 +1,23 @@
+============================
+AKADEMİK CHATBOT - ÇALIŞTIRMA KOMUTLARI
+============================
+
+1. Proje klasörüne git:
+   cd "c:\Users\bozca\Desktop\Eğitim Alanında Özelleştirilmiş Rag Tabanlı Chatbot"
+
+2. Sanal ortamı aktif et:
+   .\venv\Scripts\activate
+
+3. Uygulamayı başlat:
+   python app.py
+
+4. Tarayıcıda aç:
+   http://localhost:5000
+
+============================
+ALTERNATIF (tek satır, sanal ortam aktif etmeden):
+   .\venv\Scripts\python.exe app.py
+============================
+
+NOT: İlk çalıştırmada embedding modeli indirileceği
+     ve veritabanı kurulacağı için biraz bekleme olabilir.
