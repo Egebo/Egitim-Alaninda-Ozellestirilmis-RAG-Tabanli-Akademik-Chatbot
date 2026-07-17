@@ -97,3 +97,12 @@ Uygulama ilk çalıştırıldığında otomatik oluşturulur (veya hazır gelen 
 - **Gemini**: Google API anahtarı gerekli (`gemini-flash-latest`)
 - İkisinden biri yoksa o model seçildiğinde hata döner
 
+
+
+## Lisans
+
+Bu proje MIT lisansi ile lisanslanmistir, detaylar icin LICENSE dosyasina bakabilirsiniz.
+
+## Gelistirici
+
+Egemen Bozca tarafindan gelistirilmektedir. Portfolyo: https://egebo.github.io | GitHub: https://github.com/Egebo
