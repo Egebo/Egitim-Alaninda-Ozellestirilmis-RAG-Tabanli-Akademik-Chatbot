@@ -345,6 +345,7 @@ html, body {
 .intent-META     { background: rgba(100,116,139,.15); color: var(--muted); }
 .intent-GENERAL  { background: rgba(52,211,153,.15); color: var(--green); }
 .intent-RAG      { background: rgba(124,92,252,.15); color: var(--accent2); }
+.intent-GUARDRAIL { background: rgba(248,113,113,.15); color: var(--red); }
 
 /* typing animation */
 .typing-bubble {
@@ -362,6 +363,12 @@ html, body {
   animation: bounce 1.2s infinite;
 }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  min-height: 14px;
+}
 .typing-dot:nth-child(3) { animation-delay: .4s; }
 @keyframes bounce {
   0%, 60%, 100% { transform: translateY(0); }
@@ -957,7 +964,7 @@ async function sendMessage() {
   const typingEl = appendTyping();
 
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -967,14 +974,36 @@ async function sendMessage() {
         karsilastir: compareMode
       })
     });
-    const data = await res.json();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parcalar = buffer.split('\n\n');
+      buffer = parcalar.pop();
+      for (const parca of parcalar) {
+        if (!parca.startsWith('data: ')) continue;
+        const olay = JSON.parse(parca.slice(6));
+        if (olay.type === 'final') {
+          finalData = olay;
+        } else {
+          const metin = olayMetni(olay);
+          if (metin) updateTypingStatus(typingEl, metin);
+        }
+      }
+    }
+
     typingEl.remove();
 
-    if (data.error) {
-      appendMessage('bot', '❌ ' + data.error, 'Hata', null);
+    if (!finalData || finalData.error) {
+      appendMessage('bot', '❌ ' + (finalData ? finalData.error : 'Bilinmeyen hata'), 'Hata', null);
     } else {
-      appendMessage('bot', data.cevap, data.kaynak, data.niyet, data.msg_tokens, data.msg_cost, data.cevap_norag);
-      updateStats(data.tokens, data.cost);
+      appendMessage('bot', finalData.cevap, finalData.kaynak, finalData.niyet, finalData.msg_tokens, finalData.msg_cost, finalData.cevap_norag);
+      updateStats(finalData.tokens, finalData.cost);
     }
   } catch (e) {
     typingEl.remove();
@@ -1014,11 +1043,14 @@ function appendMessage(role, text, source, intent, tokens, cost, cevap_norag) {
 
   let srcHtml = '';
   if (source && role === 'bot') {
-    const srcClass = srcMap(source);
-    srcHtml += `<span class="msg-source ${srcClass}">📌 ${source}</span>`;
+    source.split('+').forEach(s => {
+      srcHtml += `<span class="msg-source ${srcMap(s)}">📌 ${s}</span>`;
+    });
   }
   if (intent && role === 'bot') {
-    srcHtml += `<span class="intent-badge intent-${intent}">${intentLabel(intent)}</span>`;
+    intent.split('+').forEach(i => {
+      srcHtml += `<span class="intent-badge intent-${i}">${intentLabel(i)}</span>`;
+    });
   }
   if (tokens !== undefined && tokens !== null && role === 'bot') {
     let costStr = '';
@@ -1080,11 +1112,34 @@ function appendTyping() {
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
       </div>
+      <div class="typing-status"></div>
     </div>
   `;
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div;
+}
+
+function updateTypingStatus(typingEl, text) {
+  const statusEl = typingEl.querySelector('.typing-status');
+  if (statusEl) statusEl.textContent = text;
+  const msgs = document.getElementById('messages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function olayMetni(olay) {
+  const isimler = { DB_QUERY: 'Veritabanı', RAG: 'Belgeler', SEARCH: 'İnternet', META: 'Sistem', GENERAL: 'Sohbet' };
+  if (olay.type === 'plan' && olay.adimlar.length > 1) {
+    return `Plan: ${olay.adimlar.map(t => isimler[t] || t).join(' + ')}`;
+  }
+  if (olay.type === 'adim_basladi') {
+    const etiket = isimler[olay.tool] || olay.tool;
+    return olay.ek ? `Yeterli bilgi bulunamadı, ${etiket} deneniyor...` : `${olay.index}/${olay.toplam}: ${etiket} sorgulanıyor...`;
+  }
+  if (olay.type === 'birlestiriliyor') {
+    return 'Sonuçlar birleştiriliyor...';
+  }
+  return '';
 }
 
 function renderHistory(history) {
@@ -1134,12 +1189,13 @@ function srcMap(src) {
   if (src.includes('verita')) return 'src-db';
   if (src.includes('belge') || src.includes('rag') || src.includes('kaynak')) return 'src-rag';
   if (src.includes('internet') || src.includes('web')) return 'src-web';
+  if (src.includes('güvenlik') || src.includes('guvenlik')) return 'src-sys';
   if (src.includes('sistem') || src.includes('hata')) return 'src-sys';
   return 'src-chat';
 }
 
 function intentLabel(intent) {
-  const map = { DB_QUERY: 'VT', SEARCH: 'WEB', META: 'META', GENERAL: 'SOHBET', RAG: 'RAG' };
+  const map = { DB_QUERY: 'VT', SEARCH: 'WEB', META: 'META', GENERAL: 'SOHBET', RAG: 'RAG', GUARDRAIL: 'GÜVENLİK' };
   return map[intent] || intent;
 }
 

@@ -4,7 +4,7 @@ Bitirme projesi: Üniversite akademik danışman chatbotu. LLM + RAG + Text-to-S
 
 ## Proje Özeti
 
-- **Backend:** `app.py` (~1100 satır): tek dosya Flask uygulaması
+- **Backend:** `app.py` (Flask app + Blueprint kaydı) + `core/` (çekirdek altyapı: state, LLM, lazy-loading, DB kurulumu) + `services/` (RAG, Text-to-SQL, orkestratör, sohbet, konuşma, crawler) + `routes/` (Blueprint'ler)
 - **Frontend:** `templates/index.html` (~800 satır): vanilla JS, koyu tema, 3 sütun layout
 - **Veritabanı:** `demo_okul.db`: SQLite, 7 tablo, demo akademik veri
 - **Vektör DB:** `chroma_db/`: Chroma, kalıcı, belgeler klasöründen besleniyor
@@ -28,10 +28,15 @@ python app.py
 
 ## Mimari
 
-### Intent Yönlendirme (`niyet_siniflandir`)
-5 kanal: `DB_QUERY` → SQL | `RAG` → belge | `SEARCH` → DuckDuckGo | `META` → chatbot hakkında | `GENERAL` → sohbet
+### Orkestratör (`services/orchestrator.py`)
+5 araç: `DB_QUERY` → SQL | `RAG` → belge | `SEARCH` → DuckDuckGo | `META` → chatbot hakkında | `GENERAL` → sohbet
 
-Önce keyword eşleştirme (hızlı, API masrafsız), başarısız olursa LLM ile sınıflandırma.
+`gorev_plani_olustur` kullanıcı sorusunu bir görev listesine (`[{tool, soru}, ...]`) çevirir. Önce keyword eşleştirme (`niyet_kurala_gore`, hızlı, API masrafsız) denenir; başarısız olursa LLM'den 1-3 adımlık JSON plan istenir. Adımlar `adimlari_calistir` ile sırayla çalıştırılır; birden fazla adım varsa sonuçlar `sonuclari_birlestir` ile tek yanıtta birleştirilir.
+
+Adımlar çalıştıktan sonra `services/gap_analysis.py::cevap_eksik_mi` birincil araçların (DB_QUERY/RAG) sonuçsuz kalıp kalmadığını kontrol eder; kaldıysa ve SEARCH henüz denenmediyse `boslugu_kapat` tek seferlik bir SEARCH adımı ekler.
+
+### Guardrails (`services/guardrails.py`)
+Kural tabanlı, LLM'siz iki kontrol: `girdi_guvenli_mi` orkestratöre gitmeden önce prompt injection kalıplarını ve aşırı uzun mesajları reddeder (niyet=`GUARDRAIL`, sıfır maliyet); `cikti_guvenli_mi` cevap kullanıcıya dönmeden önce API key/sır sızıntısı desenlerini redakte eder.
 
 ### Text-to-SQL (`sql_uret_ve_calistir`)
 - 12 elle yazılmış örnek sorgu + semantik benzerlik seçimi (few-shot)
@@ -40,14 +45,14 @@ python app.py
 
 ### Belge RAG (`RagManager`)
 - Embedding: `intfloat/multilingual-e5-small` (HuggingFace, yerel)
-- Chunk: 1000 token, 200 token overlap
+- Chunk: embedding modelinin kendi tokenizer'ıyla ölçülen 400 token, 80 token overlap (önceden karakter sayısıyla ölçülüyordu, model limitini aşma riski taşıyordu)
 - Eşik: benzerlik=0.45, fallback=0.1, max_chunks=20
 - Çok belgeli sorgularda k orantısal dağıtılır
 
 ### Web Crawler (`website_to_rag`)
-- robots.txt'e saygılı
-- Maksimum 30 sayfa, 0.3s gecikme
-- HTML → temiz metin → RAG'a ekle
+- `FIRECRAWL_API_KEY` tanımlıysa Firecrawl API'si kullanılır (JS render, temiz markdown çıktısı); tanımlı değilse veya çağrı başarısız olursa otomatik olarak klasik tarayıcıya düşülür
+- Klasik tarayıcı: robots.txt'e saygılı, maksimum 30 sayfa, 0.3s gecikme, HTML → temiz metin
+- Her iki yol da sonucu aynı şekilde `RagManager.add_document`'a besler
 
 ### LLM Desteği
 - **ChatGPT:** `gpt-4o-mini` ($0.30/1M token)
@@ -59,15 +64,17 @@ python app.py
 
 - **Lazy loading:** ML kütüphaneleri ilk API isteğine kadar yüklenmez → hızlı başlangıç
 - **builtins injection:** Büyük modüller Python builtins'e kaydedilir, iç içe fonksiyonlarda tekrar import olmaz
-- **Monolitik backend:** Modüler değil, tek `app.py`: öğrenci projesi için kasıtlı basitlik
+- **Katmanlı backend:** `core/` (altyapı) → `services/` (iş mantığı) → `routes/` (Flask Blueprint'leri); paylaşılan durum `core/state.py::AppState` üzerinden tek noktadan yönetilir
 - **Bağlam penceresi:** Son 5 konuşma turu prompt'a eklenir
+- **Event-based streaming:** `services/chat.py::_chat_akisi` sohbet üretiminin tek kaynağı — ilerleme olayları (`plan`, `adim_basladi`, `adim_bitti`, `birlestiriliyor`, `final`) yield eden bir generator. `chat_yanit_uret` (senkron, `/api/chat`) bunu tüketip sadece `final`'i döner; `chat_yanit_uret_stream` (`/api/chat/stream`, SSE) tüm olayları frontend'e canlı iletir
 
 ## API Endpoint'leri
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | POST | `/api/init` | Sistemi başlat (modeller + DB) |
-| POST | `/api/chat` | Mesaj gönder, yanıt al |
+| POST | `/api/chat` | Mesaj gönder, yanıt al (senkron, tek JSON) |
+| POST | `/api/chat/stream` | Aynı işi yapar, Server-Sent Events ile orkestratör adımlarını canlı yayınlar |
 | GET/POST/DELETE | `/api/conversations/*` | Konuşma yönetimi |
 | GET/POST/DELETE | `/api/documents/*` | Belge yönetimi |
 | POST | `/api/crawl` | Web sitesi tara ve RAG'a ekle |
@@ -76,8 +83,9 @@ python app.py
 ## Ortam Değişkenleri (`.env`)
 
 ```
-OPENAI_API_KEY=...    # ChatGPT için
-GOOGLE_API_KEY=...    # Gemini için
+OPENAI_API_KEY=...      # ChatGPT için
+GOOGLE_API_KEY=...      # Gemini için
+FIRECRAWL_API_KEY=...   # Web taraması için (opsiyonel, yoksa klasik tarayıcı kullanılır)
 ```
 
 ## Mevcut Durum (2026-06-10)
@@ -103,7 +111,10 @@ GOOGLE_API_KEY=...    # Gemini için
 
 ```
 academic_chatbot/
-├── app.py                    # Ana backend (Flask + tüm AI mantığı)
+├── app.py                    # Flask app + Blueprint kaydı + giriş noktası
+├── core/                     # Çekirdek altyapı (state, LLM, lazy-loading, DB kurulumu)
+├── services/                 # İş mantığı (RAG, Text-to-SQL, orkestratör, sohbet, konuşma, crawler)
+├── routes/                   # Flask Blueprint'leri
 ├── requirements.txt          # Python bağımlılıkları
 ├── .env                      # API anahtarları (git'e ekleme!)
 ├── demo_okul.db              # SQLite DB (otomatik oluşturulur)
