@@ -4,6 +4,15 @@ import pytest
 from core.state import state
 
 
+@pytest.fixture(autouse=True)
+def _gercek_api_anahtarlarini_gizle(monkeypatch):
+    """Bir test yanlislikla _get_llm'i mock'lamayi unutursa gercek bir API
+    cagrisi denemek yerine hemen ValueError ile patlasin diye, her testte
+    gercek API anahtarlarini ortamdan gizler."""
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    monkeypatch.delenv('GOOGLE_API_KEY', raising=False)
+
+
 @pytest.fixture
 def fresh_state():
     """
