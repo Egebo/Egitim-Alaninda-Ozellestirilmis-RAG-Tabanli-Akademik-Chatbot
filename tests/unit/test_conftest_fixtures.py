@@ -8,7 +8,7 @@ def test_fresh_state_degeri_degistirir(fresh_state):
     assert state.conv_counter == 42
 
 
-# UYARI: Bu test fresh_state fixture'i ISTEMINYOR cunku fixture'in setup'i
+# UYARI: Bu test fresh_state fixture'i ISTEMIYOR cunku fixture'in setup'i
 # conv_counter'i 0'a sifirlardi ve teardown kontrolu anlamsiz olurdu. Onceki
 # test'in yaptigi 42 degerini raw singleton'dan dogru secebilmek icin fixture
 # kullanmiyoruz. Bunun basarili olmasi, bu test'in dosya-tanimi sirasinda
