@@ -10,6 +10,10 @@ def client():
     from app import app
     app.config['TESTING'] = True
     with app.test_client() as c:
+        # Korumali /api/* route'lari test edebilmek icin, gercek demo hesabiyla
+        # giris yapilmis bir oturumla baslatilir (bkz. tests/integration/test_auth_routes.py
+        # login/logout/korumali-route davranisinin kendisini dogrular).
+        c.post('/api/login', json={'email': 'admin@admin.com', 'sifre': '123456'})
         yield c
 
 

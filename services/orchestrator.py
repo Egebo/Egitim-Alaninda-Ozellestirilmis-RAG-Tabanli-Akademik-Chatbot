@@ -3,13 +3,42 @@ Kullanıcı sorusunu bir görev listesine (to-do list) dönüştürüp sırayla 
 Ayrıca tek-adımlık GENERAL/SEARCH sorularında kullanılan genel sohbet ve internet arama yardımcılarını içerir.
 """
 import re
-import json
+
+from pydantic import BaseModel, Field
 
 from core.state import state
 from core.llm import llm_invoke_tracked, extract_text
 from services.text_to_sql import sql_uret_ve_calistir, db_sonuc_formatla
 
 GECERLI_ARACLAR = ['DB_QUERY', 'RAG', 'SEARCH', 'META', 'GENERAL']
+
+
+class DB_QUERY(BaseModel):
+    """Akademik veritabanindaki ogrenci/ders/not/hoca/bolum/proje/danisman/akts/ortalama/harfnotu bilgisi icin kullanilir."""
+    soru: str = Field(description='Veritabanina yoneltilecek dogal dil alt-sorusu')
+
+
+class RAG(BaseModel):
+    """Yuklu dosyalardan/belgelerden cevaplanmasi gereken sorular icin kullanilir."""
+    soru: str = Field(description='Belgelere yoneltilecek dogal dil alt-sorusu')
+
+
+class SEARCH(BaseModel):
+    """Internette aranmasi gereken guncel veya genel bir bilgi icin kullanilir."""
+    soru: str = Field(description='Internette aranacak dogal dil sorusu')
+
+
+class META(BaseModel):
+    """Chatbotun kendi durumu hakkinda soru icin kullanilir (yuklu belge, aktif model vb.)."""
+    soru: str = Field(description='Chatbotun durumu hakkindaki soru')
+
+
+class GENERAL(BaseModel):
+    """Genel sohbet, selamlasma, tavsiye veya fikir sorma icin kullanilir."""
+    soru: str = Field(description='Genel sohbet mesaji')
+
+
+_ARAC_SEMALARI = {'DB_QUERY': DB_QUERY, 'RAG': RAG, 'SEARCH': SEARCH, 'META': META, 'GENERAL': GENERAL}
 
 
 def genel_cevap_uret(soru: str, gecmis: str, llm=None) -> str:
@@ -32,9 +61,12 @@ def internet_arama_yap(soru: str, llm=None) -> str:
         return f'İnternet araması yapılamadı: {e}'
 
 
-def niyet_kurala_gore(soru: str) -> str | None:
+def niyet_kurala_gore(soru: str, conv_id: str = None) -> str | None:
     """
     Kural tabanlı (LLM çağırmadan) hızlı niyet tespiti. Eşleşme yoksa None döner.
+    `conv_id` verilirse RAG ile ilgili kontroller sadece o sohbetin erişebildiği
+    belgelere (özel + global) bakar; verilmezse (testler, programatik kullanım)
+    eski davranış gibi state.rag_manager.documents'ın tamamına bakar.
     """
     s_lower = soru.lower()
 
@@ -52,19 +84,21 @@ def niyet_kurala_gore(soru: str) -> str | None:
     if any(k in s_lower for k in meta_kelimeleri):
         return 'META'
 
+    izinli_belgeler = state.rag_manager.erisilebilir_belgeler(conv_id) if state.rag_manager else {}
+
     rag_keywords = ['aday', 'cv', 'özgeçmiş', 'ozgecmis', 'belge', 'dosya',
                     'başvuru', 'basvuru', 'sertifika', 'deneyim', 'yetenek',
                     'beceri', 'mezun', 'diploma', 'işe al', 'ise al']
-    if state.rag_manager and state.rag_manager.documents and any(k in s_lower for k in rag_keywords):
+    if izinli_belgeler and any(k in s_lower for k in rag_keywords):
         return 'RAG'
 
     # Soru, yüklü bir belgenin adında geçen kişi/konu isimlerine atıfta bulunuyorsa
     # (örn. "CV_-_Egemen_Bozca.pdf" belgesi yüklüyken "Egemen Bozca" sorulması),
     # DB anahtar kelimesi (örn. "hoca") eşleşse bile hızlı yoldan çıkma — LLM'in
     # çok adımlı plan kurmasına (RAG + gerekirse DB_QUERY) izin ver.
-    if state.rag_manager and state.rag_manager.documents:
+    if izinli_belgeler:
         stopwords = {'pdf', 'txt', 'xlsx', 'xls', 'doc', 'docx', 'cv', 'ozgecmis', 'özgeçmiş'}
-        for doc_name in state.rag_manager.documents.keys():
+        for doc_name in izinli_belgeler.keys():
             base = doc_name.rsplit('.', 1)[0]
             tokens = [t for t in re.split(r'[^a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+', base.lower())
                       if len(t) > 2 and t not in stopwords]
@@ -80,63 +114,57 @@ def niyet_kurala_gore(soru: str) -> str | None:
     return None
 
 
-def gorev_plani_olustur(soru: str, llm=None, gecmis: str = '') -> list:
+def gorev_plani_olustur(soru: str, llm=None, gecmis: str = '', conv_id: str = None) -> list:
     """
-    Kullanıcının sorusunu bir veya daha fazla {'tool','soru'} adımından oluşan
-    bir görev listesine (to-do list) dönüştürür. Çoğu soru tek adımlık çıkar;
-    LLM sadece kural tabanlı tespit başarısız olduğunda ve gerektiğinde birden
-    fazla adım önerir.
+    Kullanicinin sorusunu bir veya daha fazla {'tool','soru'} adimindan olusan
+    bir gorev listesine (to-do list) donusturur. Cogu soru tek adimlik cikar;
+    LLM sadece kural tabanli tespit basarisiz oldugunda ve gerektiginde birden
+    fazla adim onerir. Plan, modelin native tool-calling mekanizmasi (bind_tools +
+    response.tool_calls) ile cikartilir; araclar gercekte cagrilmaz, sadece
+    structured cikti semasi olarak kullanilir.
     """
     llm = llm or state.llm_default
 
-    kural_sonucu = niyet_kurala_gore(soru)
+    kural_sonucu = niyet_kurala_gore(soru, conv_id)
     if kural_sonucu:
         return [{'tool': kural_sonucu, 'soru': soru}]
 
-    has_docs = bool(state.rag_manager and state.rag_manager.documents)
-    doc_names = list(state.rag_manager.documents.keys()) if has_docs else []
+    izinli_belgeler = state.rag_manager.erisilebilir_belgeler(conv_id) if state.rag_manager else {}
+    has_docs = bool(izinli_belgeler)
+    doc_names = list(izinli_belgeler.keys())
     doc_info = f"(Yuklu Dosyalar: {doc_names})" if has_docs else "(Dosya yok)"
 
-    prompt = f"""Asagidaki soruyu cevaplamak icin gereken adimlari belirle. SADECE gecerli bir JSON listesi dondur,
-baska hicbir metin yazma. Her adim {{"tool": "...", "soru": "..."}} seklinde olmali.
+    arac_isimleri = [ad for ad in GECERLI_ARACLAR if ad != 'RAG' or has_docs]
+    semalar = [_ARAC_SEMALARI[ad] for ad in arac_isimleri]
 
-Kullanilabilecek tool degerleri:
-DB_QUERY  → Akademik veritabanindaki ogrenci/ders/not/hoca/bolum/proje/danisman/akts/ortalama/harfnotu bilgisi
-RAG       → Yuklu dosyalardan/belgelerden cevaplanmasi gereken sorular {doc_info}
-SEARCH    → Internette aranmasi gereken guncel veya genel bir bilgi
-GENERAL   → Genel sohbet, selamlasma, tavsiye, fikir sorma
-META      → Chatbotun kendi durumu hakkinda soru (yuklu belge, model vb.)
+    prompt = f"""Asagidaki soruyu cevaplamak icin uygun arac(lar)i cagir (en fazla 3).
+Sorularin buyuk cogunlugu TEK bir aracla cevaplanir, o yuzden varsayilan olarak
+tek bir arac cagir. Sadece soru acikca birden fazla FARKLI kaynaktan bilgi
+istiyorsa (ornek: hem bir ogrencinin notunu hem de yuklu bir belgedeki proje
+ornegini istemek) birden fazla arac cagir.
 
-ONEMLI: Sorularin buyuk cogunlugu TEK bir adimla cevaplanir, o yuzden varsayilan olarak tek elemanli bir liste don.
-Sadece soru acikca birden fazla FARKLI kaynaktan bilgi istiyorsa (ornek: hem bir ogrencinin notunu hem de yuklu
-bir belgedeki proje ornegini istemek) birden fazla adim don. En fazla 3 adim don.
+{doc_info}
 
-ONEMLI: Soru, yuklu dosya isimlerinde gecen veya ima edilen kisiler/konular ile ilgiliyse RAG kullan, veritabaninda
-bu kisiler bulunmaz.
-
-ONEMLI: Soru "isimleri", "adlari", "onlar", "bunlar", "kac tane", "detaylari", "o kisi", "ayni" gibi onceki
-konusmaya atifta bulunan ifadeler iceriyorsa, onceki konusmanin baglamini kullan.
+ONEMLI: Soru "isimleri", "adlari", "onlar", "bunlar", "kac tane", "detaylari",
+"o kisi", "ayni" gibi onceki konusmaya atifta bulunan ifadeler iceriyorsa,
+onceki konusmanin baglamini kullan.
 
 Onceki konusma (baglam icin kullan):
 {gecmis or 'Yok'}
 
-Soru: "{soru}"
-
-JSON:"""
+Soru: "{soru}\""""
 
     try:
-        ham = extract_text(llm_invoke_tracked(llm, prompt)).strip()
-        ham = re.sub(r'^```(json)?|```$', '', ham, flags=re.MULTILINE).strip()
-        adimlar = json.loads(ham)
+        yanit = llm.bind_tools(semalar).invoke(prompt)
+        tool_calls = list(getattr(yanit, 'tool_calls', None) or [])
 
         gecerli_adimlar = []
-        for adim in adimlar[:3]:
-            tool = str(adim.get('tool', '')).upper()
-            alt_soru = str(adim.get('soru') or soru)
-            if tool not in GECERLI_ARACLAR:
+        for cagri in tool_calls[:3]:
+            tool = str(cagri.get('name', '')).upper()
+            args = cagri.get('args') or {}
+            alt_soru = str(args.get('soru') or soru)
+            if tool not in arac_isimleri:
                 continue
-            if tool == 'RAG' and not has_docs:
-                tool = 'GENERAL'
             gecerli_adimlar.append({'tool': tool, 'soru': alt_soru})
 
         if gecerli_adimlar:
@@ -147,16 +175,18 @@ JSON:"""
     return [{'tool': 'GENERAL', 'soru': soru}]
 
 
-def adim_calistir(adim: dict, gecmis: str, llm, model_name: str) -> dict:
+def adim_calistir(adim: dict, gecmis: str, llm, model_name: str, conv_id: str = None) -> dict:
     """
     Tek bir görev adımını (tool + soru) çalıştırır ve {'tool','soru','cevap','kaynak'} döndürür.
     GENERAL adımlarında önce belgelerde (RAG) örtük bir yanıt olup olmadığına bakılır,
-    ardından Genel Sohbet'e düşülür (eski niyet kaskad mantığıyla aynı).
+    ardından Genel Sohbet'e düşülür (eski niyet kaskad mantığıyla aynı). `conv_id`,
+    RAG/META adımlarının hangi belgelere erişebileceğini (özel + global) belirler.
     """
     tool = adim['tool']
     soru = adim['soru']
     cevap = None
     kaynak = 'Bilinmeyen'
+    izinli_belgeler = state.rag_manager.erisilebilir_belgeler(conv_id) if state.rag_manager else {}
 
     if tool == 'DB_QUERY':
         if not state.db:
@@ -171,15 +201,15 @@ def adim_calistir(adim: dict, gecmis: str, llm, model_name: str) -> dict:
                 cevap = f'Bu soruyu işleyemedim: {e}'
                 kaynak = 'Hata'
     elif tool == 'RAG':
-        if state.rag_manager and state.rag_manager.documents:
-            result = state.rag_manager.ask_all(soru, llm)
+        if izinli_belgeler:
+            result = state.rag_manager.ask_all(soru, llm, conv_id=conv_id)
             if result:
                 cevap, kaynak = result
         if cevap is None:
             cevap = 'Yüklü belgelerde bu soruya yanıt bulunamadı.'
             kaynak = 'Belgeler'
     elif tool == 'META':
-        docs = state.rag_manager.list_documents() if state.rag_manager else []
+        docs = list(izinli_belgeler.keys())
         cevap = extract_text(llm_invoke_tracked(llm, [
             ('system', 'Sen bir sistem asistanısın. Türkçe cevap ver.'),
             ('human', f'Senin adın Akademik Chatbot. Model: {model_name}. Yüklü belgeler: {docs or "Yok"}. Soru: {soru}')
@@ -189,8 +219,8 @@ def adim_calistir(adim: dict, gecmis: str, llm, model_name: str) -> dict:
         cevap = internet_arama_yap(soru, llm)
         kaynak = 'İnternet'
     else:  # GENERAL
-        if state.rag_manager and state.rag_manager.documents:
-            result = state.rag_manager.ask_all(soru, llm)
+        if izinli_belgeler:
+            result = state.rag_manager.ask_all(soru, llm, conv_id=conv_id)
             if result:
                 cevap, kaynak = result
                 red_kelimeleri = ['yeterli bilgi bulunmamaktadır', 'kapsamamaktadır',
@@ -205,9 +235,9 @@ def adim_calistir(adim: dict, gecmis: str, llm, model_name: str) -> dict:
     return {'tool': tool, 'soru': soru, 'cevap': cevap, 'kaynak': kaynak}
 
 
-def adimlari_calistir(adimlar: list, gecmis: str, llm, model_name: str) -> list:
+def adimlari_calistir(adimlar: list, gecmis: str, llm, model_name: str, conv_id: str = None) -> list:
     """Görev listesindeki adımları sırayla çalıştırır ve sonuç listesini döndürür."""
-    return [adim_calistir(adim, gecmis, llm, model_name) for adim in adimlar]
+    return [adim_calistir(adim, gecmis, llm, model_name, conv_id) for adim in adimlar]
 
 
 def sonuclari_birlestir(soru: str, sonuclar: list, llm) -> str:

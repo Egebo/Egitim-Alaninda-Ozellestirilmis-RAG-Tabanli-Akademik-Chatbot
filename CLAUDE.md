@@ -26,6 +26,8 @@ python app.py
 
 İlk başlatmada ~2-3 dakika sürer (HuggingFace embedding modeli ~1.5GB indirilir). Sonraki başlatmalar hızlıdır.
 
+Giriş ekranı karşılar (demo hesaplar: `admin@admin.com`/`123456`, `ogretmen@uni.com`/`pass123`). Sohbetler `conversations.db`'ye kalıcı yazılır, sunucu yeniden başlasa da kaybolmaz.
+
 ## Mimari
 
 ### Orkestratör (`services/orchestrator.py`)

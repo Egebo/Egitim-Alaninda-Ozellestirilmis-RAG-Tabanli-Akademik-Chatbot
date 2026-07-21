@@ -1,4 +1,5 @@
 """Web sitesi tarayıcı: sayfaları çeker, düz metne çevirir ve RAG'a belge olarak ekler."""
+import logging
 import os
 import re
 import time
@@ -9,6 +10,8 @@ from html.parser import HTMLParser
 
 from core.state import state
 from core.lazy_imports import ensure_imports
+
+logger = logging.getLogger(__name__)
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -56,7 +59,7 @@ def _get_links(html, base_url):
 
 def _website_to_rag_klasik(start_url, max_pages=30, delay=0.3, respect_robots=True, status_cb=None):
     def log(m):
-        print(f'[CRAWLER] {m}')
+        logger.info(f'[CRAWLER] {m}')
         if status_cb: status_cb(m)
 
     parsed = urlparse(start_url)
@@ -121,7 +124,7 @@ def _website_to_rag_firecrawl(start_url, max_pages, status_cb=None):
     from firecrawl import Firecrawl
 
     def log(m):
-        print(f'[CRAWLER] {m}')
+        logger.info(f'[CRAWLER] {m}')
         if status_cb: status_cb(m)
 
     api_key = os.environ.get('FIRECRAWL_API_KEY')
@@ -164,6 +167,6 @@ def website_to_rag(start_url, max_pages=30, delay=0.3, respect_robots=True, stat
         try:
             return _website_to_rag_firecrawl(start_url, max_pages, status_cb)
         except Exception as e:
-            print(f'⚠️ Firecrawl taraması başarısız, klasik tarayıcıya dönülüyor: {e}')
+            logger.warning(f'⚠️ Firecrawl taraması başarısız, klasik tarayıcıya dönülüyor: {e}')
 
     return _website_to_rag_klasik(start_url, max_pages, delay, respect_robots, status_cb)

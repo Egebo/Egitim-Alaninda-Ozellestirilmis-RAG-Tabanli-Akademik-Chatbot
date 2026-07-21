@@ -12,3 +12,19 @@ chroma_db/
 # uploaded demo documents (may contain personal data — do not commit)
 uploads/*
 !uploads/.gitkeep
+
+# eval harness reports (generated, timestamped)
+eval/results/*
+!eval/results/.gitkeep
+
+# persisted conversation history (private user data, not a demo fixture)
+conversations.db
+
+# tez/sunum malzemeleri — ekip arkadaslarinin ozel CV'lerini ve buyuk medya
+# dosyalarini (video, pptx) icerir, koda ait degil, repo'ya girmemeli
+Bitirme Dosyaları/
+
+# proje klasorunun disindan (Desktop\Projelerim) miras kalan ilgisiz kardes
+# klasorler — bu projeyle alakasiz, yanlislikla commit'lenmesin
+react_uygulama/
+tasarim_projesi/

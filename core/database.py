@@ -1,5 +1,42 @@
 """Demo akademik SQLite veritabanının ilk kurulumu (şema + tohum veri)."""
+import logging
+import os
 import sqlite3
+
+from werkzeug.security import generate_password_hash
+
+logger = logging.getLogger(__name__)
+
+
+def demo_db_hazirla(db_filename='demo_okul.db'):
+    """
+    demo_okul.db dosyasının var olduğundan ve güncel şemaya sahip olduğundan
+    emin olur; yoksa veya şeması eskiyse (projeler tablosu eksikse) yeniden
+    kurar. Hem `app.py` açılışında (login akışı için erken, ucuz bir kurulum —
+    ML kütüphaneleri gerektirmez) hem `core/lazy_imports.py::ensure_imports`
+    içinde (ağır LangChain/SQLDatabase kurulumundan önce) çağrılır.
+    """
+    recreate = False
+    if os.path.exists(db_filename):
+        try:
+            conn = sqlite3.connect(db_filename)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projeler'")
+            if not cur.fetchone():
+                recreate = True
+            conn.close()
+        except Exception:
+            recreate = True
+
+    if recreate and os.path.exists(db_filename):
+        try:
+            os.remove(db_filename)
+            logger.info('♻️ Eski veritabanı şeması silindi, yeniden kurulacak.')
+        except Exception as e:
+            logger.error(f'♻️ Eski veritabanı silinemedi: {e}')
+
+    if not os.path.exists(db_filename):
+        _setup_database(db_filename)
 
 
 def _setup_database(db_filename):
@@ -12,8 +49,8 @@ def _setup_database(db_filename):
     cur = conn.cursor()
 
     # Tablo Tanımlamaları:
-    # 1. Kullanıcılar tablosu (Gelecekteki giriş/auth sistemleri için taslak)
-    cur.execute('CREATE TABLE kullanicilar   (kullaniciid   INTEGER PRIMARY KEY, email TEXT, sifrehash TEXT)')
+    # 1. Kullanıcılar tablosu (login akışı için)
+    cur.execute('CREATE TABLE kullanicilar   (kullaniciid   INTEGER PRIMARY KEY, email TEXT UNIQUE, sifrehash TEXT)')
     # 2. Üniversite Bölümleri
     cur.execute('CREATE TABLE bolumler       (bolumid       INTEGER PRIMARY KEY, bolumadi TEXT)')
     # 3. Akademisyenler (Hocalar)
@@ -28,8 +65,8 @@ def _setup_database(db_filename):
     cur.execute('CREATE TABLE projeler       (projeid       INTEGER PRIMARY KEY, baslik TEXT, konu TEXT, ogrenciid INTEGER, danismanid INTEGER)')
 
     cur.executemany('INSERT INTO kullanicilar VALUES (?,?,?)', [
-        (1,'admin@admin.com','123456'),
-        (2,'ogretmen@uni.com','pass123')
+        (1, 'admin@admin.com', generate_password_hash('123456')),
+        (2, 'ogretmen@uni.com', generate_password_hash('pass123'))
     ])
 
     cur.executemany('INSERT INTO bolumler VALUES (?,?)', [
@@ -154,4 +191,4 @@ def _setup_database(db_filename):
 
     conn.commit()
     conn.close()
-    print('✅ Zenginleştirilmiş Demo DB kuruldu.')
+    logger.info('✅ Zenginleştirilmiş Demo DB kuruldu.')

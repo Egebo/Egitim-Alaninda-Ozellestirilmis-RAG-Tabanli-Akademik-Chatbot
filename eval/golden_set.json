@@ -1,0 +1,79 @@
+[
+  {
+    "id": "db-001",
+    "category": "DB_QUERY",
+    "soru": "Bilgisayar Mühendisliği bölümünde kaç öğrenci var?",
+    "ground_truth": "6"
+  },
+  {
+    "id": "db-002",
+    "category": "DB_QUERY",
+    "soru": "Yapay Zeka Mühendisliği bölümünde kaç öğrenci var?",
+    "ground_truth": "5"
+  },
+  {
+    "id": "db-003",
+    "category": "DB_QUERY",
+    "soru": "Ahmet Yılmaz hocanın hangi dersleri var?",
+    "ground_truth": "Yapay Zeka, Veritabanı Yönetim Sistemleri"
+  },
+  {
+    "id": "db-004",
+    "category": "DB_QUERY",
+    "soru": "Ahmet Yılmaz hocanın danışmanlığındaki öğrenciler kimlerdir?",
+    "ground_truth": "Ali Kaya, Emre Çelik, Pınar Bulut"
+  },
+  {
+    "id": "db-005",
+    "category": "DB_QUERY",
+    "soru": "Okulda toplam kaç öğrenci var?",
+    "ground_truth": "25"
+  },
+  {
+    "id": "rag-001",
+    "category": "RAG",
+    "soru": "Bu belgede toplam kaç ana bölüm (BOLUM) var?",
+    "ground_truth": "15",
+    "kaynak_dosya": "buyuk_test_dokumani.txt"
+  },
+  {
+    "id": "rag-002",
+    "category": "RAG",
+    "soru": "Bu belgenin 1. bölümünün konusu nedir?",
+    "ground_truth": "Yapay Zeka ve Makine Öğrenmesi",
+    "kaynak_dosya": "buyuk_test_dokumani.txt"
+  },
+  {
+    "id": "rag-003",
+    "category": "RAG",
+    "soru": "Bu belgenin 12. bölümünün konusu nedir?",
+    "ground_truth": "Doğal Dil İşleme",
+    "kaynak_dosya": "buyuk_test_dokumani.txt"
+  },
+  {
+    "id": "rag-004",
+    "category": "RAG",
+    "soru": "Bu belgede Siber Güvenlik konusu kaçıncı bölümde işleniyor?",
+    "ground_truth": "9. bölüm",
+    "kaynak_dosya": "buyuk_test_dokumani.txt"
+  },
+  {
+    "id": "rag-005",
+    "category": "RAG",
+    "soru": "Bu belgenin son (15.) bölümünün konusu nedir?",
+    "ground_truth": "Gömülü Sistemler",
+    "kaynak_dosya": "buyuk_test_dokumani.txt"
+  },
+  {
+    "id": "meta-001",
+    "category": "META",
+    "soru": "Şu an hangi model aktif?",
+    "ground_truth": null
+  },
+  {
+    "id": "general-001",
+    "category": "GENERAL",
+    "soru": "Merhaba, bugün nasılsın?",
+    "ground_truth": null
+  }
+]

@@ -1,10 +1,15 @@
 """Sohbet turunu koordine eden ana akış: bağlamlaştırma → orkestratör → yanıt üretimi."""
+import logging
+
 from core.state import state
 from core.llm import _get_llm, llm_invoke_tracked, extract_text
 from core.lazy_imports import ensure_imports
+from core import conversation_store as depo
 from services.orchestrator import gorev_plani_olustur, adim_calistir, sonuclari_birlestir, genel_cevap_uret
 from services.gap_analysis import cevap_eksik_mi, boslugu_kapat
 from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi
+
+logger = logging.getLogger(__name__)
 
 
 def soruyu_baglamla_guncelle(soru: str, gecmis: str, llm=None) -> str:
@@ -43,8 +48,50 @@ Yeniden yazılmış soru:"""
             yeni_soru = re.sub(r'^["\']|["\']$', '', yeni_soru).strip()
             return yeni_soru
     except Exception as e:
-        print(f"⚠️ Soruyu bağlamlaştırma hatası: {e}")
+        logger.warning(f"⚠️ Soruyu bağlamlaştırma hatası: {e}")
     return soru
+
+
+def _sohbet_basligi_uret(soru: str, llm=None) -> str:
+    """
+    Bir sohbetin ilk mesajından ChatGPT/Claude/Gemini tarzı kısa bir başlık
+    üretir. LLM çağrısı başarısız olursa sorunun kendisinden kırpılmış bir
+    başlığa düşer (asla boş dönmez).
+    """
+    llm = llm or state.llm_default
+    try:
+        ham = extract_text(llm_invoke_tracked(llm,
+            'Aşağıdaki kullanıcı mesajı için en fazla 5 kelimelik, kısa ve açıklayıcı bir '
+            'Türkçe sohbet başlığı üret. SADECE başlığı döndür, tırnak işareti veya '
+            f'noktalama fazlalığı kullanma.\n\nMesaj: {soru}'
+        )).strip().strip('"\'.,;:، \n')
+        if ham:
+            return ham[:60]
+    except Exception as e:
+        logger.warning(f"⚠️ Sohbet başlığı üretme hatası: {e}")
+    return soru[:60]
+
+
+def _norag_gecmis_olustur(history: list) -> str:
+    """
+    Karşılaştırma modundaki 'RAG'sız' kontrol yanıtı için temizlenmiş bir
+    konuşma geçmişi üretir. Ham `gecmis` (soruyu_baglamla_guncelle ve
+    gorev_plani_olustur'un kullandığı) önceki turların botun ürettiği tam
+    metnini içerir — bu metin DB_QUERY/RAG/SEARCH kaynaklıysa, 'RAG'sız'
+    yanıt onu konuşma geçmişi üzerinden arka kapıdan görür ve karşılaştırma
+    sahte bir şekilde iyi çıkar. Bu fonksiyon retrieval kaynaklı turların
+    cevap metnini gizler, sadece GENERAL/META (saf sohbet) turlarının
+    metnini olduğu gibi bırakır.
+    """
+    satirlar = []
+    for h in history[-5:]:
+        niyet = h.get('niyet') or ''
+        retrieval_kaynakli = any(arac in niyet for arac in ('DB_QUERY', 'RAG', 'SEARCH'))
+        if retrieval_kaynakli:
+            satirlar.append(f"Kullanıcı: {h['user']}\nBot: (bir kaynaktan yanıt verildi, içerik burada gösterilmiyor)")
+        else:
+            satirlar.append(f"Kullanıcı: {h['user']}\nBot: {h['cevap']}")
+    return '\n'.join(satirlar)
 
 
 def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilastir: bool = False):
@@ -70,13 +117,16 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
             'user': soru, 'cevap': red_mesaji, 'cevap_norag': None,
             'kaynak': 'Güvenlik', 'tokens': 0, 'cost': 0.0, 'niyet': 'GUARDRAIL'
         })
+        depo.mesaj_ekle(conv_id, conv['history'][-1], len(conv['history']), conv['tokens'], conv['cost'])
         yield {
             'type': 'final',
             'cevap': red_mesaji, 'cevap_norag': None, 'kaynak': 'Güvenlik', 'niyet': 'GUARDRAIL',
             'tokens': conv['tokens'], 'cost': f'${conv["cost"]:.5f}',
-            'msg_tokens': 0, 'msg_cost': '$0.00000'
+            'msg_tokens': 0, 'msg_cost': '$0.00000', 'sohbet_ismi': None
         }
         return
+
+    ilk_mesaj_mi = len(conv['history']) == 0
 
     gecmis = '\n'.join(
         f"Kullanıcı: {h['user']}\nBot: {h['cevap']}"
@@ -87,7 +137,7 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
 
     soru_baglamli = soruyu_baglamla_guncelle(soru, gecmis, llm)
 
-    adimlar = gorev_plani_olustur(soru_baglamli, llm, gecmis)
+    adimlar = gorev_plani_olustur(soru_baglamli, llm, gecmis, conv_id)
     niyet = '+'.join(dict.fromkeys(a['tool'] for a in adimlar))
     cevap = None
     kaynak = 'Bilinmeyen'
@@ -101,7 +151,7 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
         sonuclar = []
         for i, adim in enumerate(adimlar, start=1):
             yield {'type': 'adim_basladi', 'tool': adim['tool'], 'index': i, 'toplam': len(adimlar)}
-            sonuc = adim_calistir(adim, gecmis, llm, model_name)
+            sonuc = adim_calistir(adim, gecmis, llm, model_name, conv_id)
             sonuclar.append(sonuc)
             yield {'type': 'adim_bitti', 'tool': sonuc['tool'], 'kaynak': sonuc['kaynak']}
 
@@ -121,14 +171,14 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
             cevap = sonuclari_birlestir(soru_baglamli, sonuclar, llm)
             kaynak = '+'.join(dict.fromkeys(s['kaynak'] for s in sonuclar))
     except Exception as e:
-        import traceback; traceback.print_exc()
+        logger.exception('Sohbet akışında beklenmeyen hata')
         cevap = f'Hata oluştu: {e}'
         kaynak = 'Sistem'
 
     # Guardrail: kullanıcıya dönmeden önce cevapta API key/sır sızıntısı var mı kontrol et.
     cevap, sizinti_var = cikti_guvenli_mi(cevap)
     if sizinti_var:
-        print(f'⚠️ Çıktıda gizli bilgi tespit edilip kaldırıldı (conv_id={conv_id})')
+        logger.warning(f'⚠️ Çıktıda gizli bilgi tespit edilip kaldırıldı (conv_id={conv_id})')
 
     cevap_norag = None
     if karsilastir:
@@ -136,7 +186,8 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
             cevap_norag = cevap
         else:
             try:
-                cevap_norag = genel_cevap_uret(soru_baglamli, gecmis, llm)
+                gecmis_norag = _norag_gecmis_olustur(conv['history'])
+                cevap_norag = genel_cevap_uret(soru_baglamli, gecmis_norag, llm)
             except Exception as e:
                 cevap_norag = f"RAG'sız yanıt üretilemedi: {e}"
 
@@ -154,6 +205,13 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
     })
     conv['tokens'] += msg_tokens
     conv['cost'] += msg_cost
+    depo.mesaj_ekle(conv_id, conv['history'][-1], len(conv['history']), conv['tokens'], conv['cost'])
+
+    yeni_baslik = None
+    if ilk_mesaj_mi:
+        yeni_baslik = _sohbet_basligi_uret(soru, llm)
+        conv['name'] = yeni_baslik
+        depo.sohbet_ismini_guncelle(conv_id, yeni_baslik)
 
     yield {
         'type': 'final',
@@ -164,7 +222,8 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
         'tokens': conv['tokens'],
         'cost': f'${conv["cost"]:.5f}',
         'msg_tokens': msg_tokens,
-        'msg_cost': f'${msg_cost:.5f}'
+        'msg_cost': f'${msg_cost:.5f}',
+        'sohbet_ismi': yeni_baslik
     }
 
 

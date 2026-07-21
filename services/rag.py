@@ -4,6 +4,7 @@ import shutil
 
 from core.state import state
 from core.llm import llm_invoke_tracked, extract_text
+from core import document_store as belge_deposu
 
 SIMILARITY_THRESHOLD = 0.45
 MAX_TOTAL_CHUNKS = 20
@@ -82,17 +83,38 @@ class RagManager:
     def list_documents(self):
         return list(self.documents.keys())
 
-    def ask_all(self, question: str, llm=None):
-        llm = llm or state.llm_default
-        if not self.documents:
+    def erisilebilir_belgeler(self, conv_id: str = None) -> dict:
+        """
+        `self.documents`'ın conv_id'ye göre filtrelenmiş halini döner: global
+        belgeler + sadece bu sohbete özel belgeler. conv_id verilmezse (ör.
+        eval harness, testler, doğrudan programatik kullanım) filtrelemesiz
+        tüm belgeler döner — bu, kapsam kaydı hiç oluşturulmamış belgelerle
+        aynı geriye dönük uyumlu davranıştır.
+        """
+        if conv_id is None:
+            return self.documents
+        return {
+            ad: veri for ad, veri in self.documents.items()
+            if belge_deposu.belge_erisilebilir_mi(ad, conv_id)
+        }
+
+    def retrieve(self, question: str, conv_id: str = None):
+        """
+        Soruya en alakali chunk'lari (LangChain Document listesi) dondurur, LLM
+        cagirmaz. Once SIMILARITY_THRESHOLD/k ile, sonuc yoksa FALLBACK_THRESHOLD/2
+        ile dener. Belge yoksa (ya da conv_id'ye erisilebilir belge yoksa) veya
+        hicbir chunk eslesmezse None doner.
+        """
+        belgeler = self.erisilebilir_belgeler(conv_id)
+        if not belgeler:
             return None
 
-        n_docs = len(self.documents)
+        n_docs = len(belgeler)
         k = _k_per_doc(n_docs)
 
         def _fetch(threshold, k_val):
             results = []
-            for doc_name, doc_data in self.documents.items():
+            for doc_name, doc_data in belgeler.items():
                 retriever = doc_data['vector_store'].as_retriever(
                     search_type='similarity_score_threshold',
                     search_kwargs={'score_threshold': threshold, 'k': k_val}
@@ -112,7 +134,14 @@ class RagManager:
         if not all_docs:
             return None
 
-        sorted_docs = all_docs[:MAX_TOTAL_CHUNKS]
+        return all_docs[:MAX_TOTAL_CHUNKS]
+
+    def ask_all(self, question: str, llm=None, conv_id: str = None):
+        llm = llm or state.llm_default
+        sorted_docs = self.retrieve(question, conv_id=conv_id)
+        if not sorted_docs:
+            return None
+
         source_counts = {}
         for d in sorted_docs:
             src = d.metadata.get('source', 'Bilinmeyen')

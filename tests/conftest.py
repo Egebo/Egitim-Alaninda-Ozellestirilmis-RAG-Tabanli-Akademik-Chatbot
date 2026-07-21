@@ -13,6 +13,15 @@ def _gercek_api_anahtarlarini_gizle(monkeypatch):
     monkeypatch.delenv('GOOGLE_API_KEY', raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _gercek_conversations_db_gizle(tmp_path, monkeypatch):
+    """Testlerin gercek conversations.db dosyasina yazmasini/okumasini engeller;
+    her testi kendi gecici SQLite dosyasina yonlendirir (_new_conv ve sohbet
+    akisi artik core.conversation_store uzerinden diske yaziyor)."""
+    from core import conversation_store
+    monkeypatch.setattr(conversation_store, 'DB_YOLU', str(tmp_path / 'test_conversations.db'))
+
+
 @pytest.fixture
 def fresh_state():
     """

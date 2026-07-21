@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from core.state import state
+from core import conversation_store as depo
 from services.conversations import _new_conv
 
 conversation_bp = Blueprint('conversations', __name__)
@@ -27,6 +28,7 @@ def api_new_conv():
 def api_delete_conv(conv_id):
     if conv_id in state.conversations:
         del state.conversations[conv_id]
+        depo.sohbet_sil(conv_id)
     if state.conversations:
         state.active_conv_id = list(state.conversations.keys())[-1]
     else:
@@ -55,4 +57,5 @@ def api_reset_conv(conv_id):
     state.conversations[conv_id]['history'] = []
     state.conversations[conv_id]['tokens'] = 0
     state.conversations[conv_id]['cost'] = 0.0
+    depo.sohbet_sifirla(conv_id)
     return jsonify({'ok': True})

@@ -1,9 +1,15 @@
+from core import conversation_store
+from core import document_store as belge_deposu
 from services.orchestrator import niyet_kurala_gore
+from services.rag import RagManager
 
 
 class _SahteRagManager:
     def __init__(self, belgeler):
         self.documents = belgeler
+
+    def erisilebilir_belgeler(self, conv_id=None):
+        return self.documents
 
 
 def test_selamlama_general_doner(fresh_state):
@@ -41,3 +47,17 @@ def test_ilgisiz_db_keywordu_belge_yukluyken_de_calisir(fresh_state):
     # Belge adiyla hicbir tokeni eslesmeyen bir DB sorusu normal calismaya devam etmeli.
     fresh_state.rag_manager = _SahteRagManager({'CV_-_Egemen_Bozca.pdf': {}})
     assert niyet_kurala_gore("Fatma Çelik hocanın dersleri neler") == 'DB_QUERY'
+
+
+def test_ozel_belgeye_baska_sohbet_rag_yolundan_erisemez(fresh_state):
+    """Gercek RagManager + document_store ile uctan uca: bir belge '1' numarali
+    sohbete ozelse, '2' numarali sohbet onu RAG hizli-yolundan goremez."""
+    conversation_store.sohbet_ekle('1', 'Sohbet 1')
+    belge_deposu.kapsam_kaydet('gizli_cv.pdf', 'ozel', sohbet_id='1')
+
+    rm = RagManager()
+    rm.documents = {'gizli_cv.pdf': {'vector_store': object()}}
+    fresh_state.rag_manager = rm
+
+    assert niyet_kurala_gore("bu cv de ne var", conv_id='1') == 'RAG'
+    assert niyet_kurala_gore("bu cv de ne var", conv_id='2') is None

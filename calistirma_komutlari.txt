@@ -3,21 +3,42 @@ AKADEMİK CHATBOT - ÇALIŞTIRMA KOMUTLARI
 ============================
 
 1. Proje klasörüne git:
-   cd "c:\Users\bozca\Desktop\Eğitim Alanında Özelleştirilmiş Rag Tabanlı Chatbot"
+   cd "c:\Users\bozca\Desktop\Projelerim\Eğitim Alanında Özelleştirilmiş RAG Tabanlı Akademik Chatbot\Eğitim Alanında Özelleştirilmiş Rag Tabanlı Chatbot"
 
 2. Sanal ortamı aktif et:
    .\venv\Scripts\activate
 
-3. Uygulamayı başlat:
+3. (Gerekirse) bağımlılıkları güncelle — ragas eklendi:
+   python -m pip install -r requirements.txt
+
+   NOT: "pip install ..." (python -m olmadan) "Fatal error in launcher" hatası
+   verirse, venv klasörü taşınmış demektir — pip.exe eski yolu hatırlıyor.
+   python -m pip her zaman çalışır. Kalıcı düzeltme:
+   python -m pip install --force-reinstall pip
+
+4. Uygulamayı başlat:
    python app.py
 
-4. Tarayıcıda aç:
+5. Tarayıcıda aç:
    http://localhost:5000
+
+6. Giriş ekranı karşılar. Demo hesaplardan biriyle giriş yap:
+   admin@admin.com    / 123456
+   ogretmen@uni.com   / pass123
 
 ============================
 ALTERNATIF (tek satır, sanal ortam aktif etmeden):
    .\venv\Scripts\python.exe app.py
 ============================
 
-NOT: İlk çalıştırmada embedding modeli indirileceği
-     ve veritabanı kurulacağı için biraz bekleme olabilir.
+EVAL HARNESS (opsiyonel, gerçek OpenAI API çağrısı yapar, ücretlidir):
+   python eval/run_eval.py
+
+NOTLAR:
+- İlk çalıştırmada embedding modeli indirileceği ve veritabanı kurulacağı
+  için biraz bekleme olabilir.
+- Sohbetler artık conversations.db'ye kalıcı yazılıyor; sunucuyu yeniden
+  başlatınca sohbet geçmişi kaybolmaz.
+- Kalıcı oturumlar için .env dosyasına SECRET_KEY ekleyin (yoksa her
+  başlatmada rastgele üretilir ve mevcut oturumlar geçersiz olur):
+   python -c "import secrets; print(secrets.token_hex(32))"

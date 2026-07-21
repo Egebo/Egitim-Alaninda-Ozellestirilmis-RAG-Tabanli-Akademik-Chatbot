@@ -58,6 +58,13 @@ python app.py
 http://localhost:5000
 ```
 
+Giriş ekranı karşılar. Demo hesaplar (`demo_okul.db` ile otomatik oluşturulur):
+
+| E-posta | Şifre |
+|---|---|
+| admin@admin.com | 123456 |
+| ogretmen@uni.com | pass123 |
+
 ## Proje Yapısı
 
 ```
@@ -98,6 +105,41 @@ Uygulama ilk çalıştırıldığında otomatik oluşturulur (veya hazır gelen 
 - İkisinden biri yoksa o model seçildiğinde hata döner
 
 
+
+## Eval Harness
+
+`eval/` klasörü, pytest'ten ayrı, gerçek API çağrısı yapan ve ücretli bir
+cevap-kalitesi değerlendirme aracı içerir. `tests/` klasöründeki pytest suite'i
+kod doğruluğunu (mock'lu, sıfır maliyet) ölçer; `eval/run_eval.py` ise gerçek
+modelin gerçek cevap kalitesini ölçer.
+
+### Çalıştırma
+
+```bash
+python eval/run_eval.py
+```
+
+Çalıştırmadan önce konsola tahmini LLM çağrı sayısı ve dolar maliyeti
+yazdırılır. `OPENAI_API_KEY` gereklidir (`.env` dosyasından okunur).
+
+### Ne ölçer
+
+- **DB_QUERY soruları:** `eval/golden_set.json`'daki beklenen değerlerin
+  cevapta geçip geçmediğine bakan basit bir eşleşme skoru (0-1 arası).
+- **RAG soruları:** [RAGAS](https://github.com/explodinggradients/ragas) ile
+  `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`
+  metrikleri.
+- **GENERAL/META soruları:** Sadece üretilen cevap raporda gösterilir,
+  otomatik skorlanmaz (açık uçlu sorular için sabit bir "doğru cevap" yok).
+
+### Ne ölçmez
+
+- Text-to-SQL'in ürettiği SQL'in kendisini değil, sadece nihai doğal dil
+  cevabı değerlendirir.
+- Orkestratörün doğru aracı seçip seçmediğini (intent routing doğruluğunu)
+  ölçmez — bu, `tests/unit/test_orchestrator_rules.py`'nin kapsamındadır.
+- Sonuçlar `eval/results/` altına tarih damgalı JSON olarak kaydedilir (git'e
+  eklenmez).
 
 ## Lisans
 

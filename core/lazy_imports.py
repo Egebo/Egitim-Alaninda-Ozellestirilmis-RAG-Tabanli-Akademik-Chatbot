@@ -1,11 +1,13 @@
 """Ağır ML/LangChain kütüphanelerinin gecikmeli (lazy) yüklenmesi."""
+import logging
 import os
-import sqlite3
 
 from core.state import state
-from core.database import _setup_database
+from core.database import demo_db_hazirla
 from core.llm import _get_llm
 from services.rag import RagManager
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_imports():
@@ -46,43 +48,23 @@ def ensure_imports():
     builtins._SQLDatabase = SQLDatabase
     builtins._SemanticSimilarityExampleSelector = SemanticSimilarityExampleSelector
 
-    print('📦 Kütüphaneler yüklendi.')
+    logger.info('📦 Kütüphaneler yüklendi.')
 
     # ── Demo SQLite Veritabanı Kontrolü ve Kurulumu ───────────────────────────
     db_filename = 'demo_okul.db'
-    recreate = False
-    if os.path.exists(db_filename):
-        try:
-            conn = sqlite3.connect(db_filename)
-            cur = conn.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projeler'")
-            if not cur.fetchone():
-                recreate = True
-            conn.close()
-        except:
-            recreate = True
-
-    if recreate and os.path.exists(db_filename):
-        try:
-            os.remove(db_filename)
-            print('♻️ Eski veritabanı şeması silindi, yeniden kurulacak.')
-        except Exception as e:
-            print(f'♻️ Eski veritabanı silinemedi: {e}')
-
-    if not os.path.exists(db_filename):
-        _setup_database(db_filename)
+    demo_db_hazirla(db_filename)
 
     try:
         state.db = SQLDatabase.from_uri(f'sqlite:///{db_filename}')
         state.CACHED_SCHEMA = state.db.get_table_info()
-        print('✅ Veritabanı bağlantısı OK')
+        logger.info('✅ Veritabanı bağlantısı OK')
     except Exception as e:
-        print(f'DB Hata: {e}')
+        logger.error(f'DB Hata: {e}')
         state.db = None
         state.CACHED_SCHEMA = ''
 
     # ── Embedding Model ve Few-Shot Örnek Seçici Kurulumu ────────────────────
-    print('⚙️ Embedding modeli yükleniyor...')
+    logger.info('⚙️ Embedding modeli yükleniyor...')
     state.embedding_model = HuggingFaceEmbeddings(model_name='intfloat/multilingual-e5-small')
 
     ornekler = [
@@ -123,20 +105,20 @@ def ensure_imports():
     if openai_ok:
         try:
             state.llm_default = _get_llm('chatgpt')
-            print('✅ Varsayılan LLM hazır (ChatGPT)!')
+            logger.info('✅ Varsayılan LLM hazır (ChatGPT)!')
         except Exception as e:
-            print(f'⚠️ ChatGPT başlatılamadı: {e}')
+            logger.warning(f'⚠️ ChatGPT başlatılamadı: {e}')
             state.llm_default = None
     elif gemini_ok:
         try:
             state.llm_default = _get_llm('gemini')
-            print('✅ Varsayılan LLM hazır (Gemini)!')
+            logger.info('✅ Varsayılan LLM hazır (Gemini)!')
         except Exception as e:
-            print(f'⚠️ Gemini başlatılamadı: {e}')
+            logger.warning(f'⚠️ Gemini başlatılamadı: {e}')
             state.llm_default = None
     else:
         state.llm_default = None
-        print('⚠️ Uyarı: OpenAI veya Google API anahtarı bulunamadı. Lütfen .env dosyasını ayarlayın.')
+        logger.warning('⚠️ Uyarı: OpenAI veya Google API anahtarı bulunamadı. Lütfen .env dosyasını ayarlayın.')
 
     # ── Belge Analiz Yöneticisi (RAG Manager) Kurulumu ────────────────────────
     state.rag_manager = RagManager()
@@ -147,8 +129,8 @@ def ensure_imports():
         state.search_tool = DuckDuckGoSearchRun()
         state.SEARCH_OK = True
     except Exception as e:
-        print(f'⚠️ DuckDuckGo başlatılamadı: {e}')
+        logger.warning(f'⚠️ DuckDuckGo başlatılamadı: {e}')
         state.SEARCH_OK = False
 
     state.imports_done = True
-    print('✅ Sistem hazır!')
+    logger.info('✅ Sistem hazır!')
