@@ -3,905 +3,1265 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Akademik RAG Chatbot</title>
+<title>Akademik Asistan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
+/* ────────────────────────────────────────────────────────────────────────
+   Tokens
+   ──────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg:        #0b0d11;
-  --surface:   #13161d;
-  --surface2:  #1b1f2a;
-  --border:    #252a38;
-  --accent:    #4f8ef7;
-  --accent2:   #7c5cfc;
-  --green:     #34d399;
-  --amber:     #fbbf24;
-  --red:       #f87171;
-  --text:      #e2e8f0;
-  --muted:     #64748b;
-  --sidebar-w: 260px;
-  --right-w:   300px;
+  --bg:              oklch(98.4% 0.003 250);
+  --surface:         oklch(96.8% 0.004 250);
+  --surface-hover:   oklch(94% 0.007 254);
+  --surface-active:  oklch(91.2% 0.01 258);
+  --border:          oklch(89% 0.007 250);
+  --border-strong:   oklch(80% 0.011 252);
+  --white:           oklch(100% 0 0);
+
+  --ink:             oklch(22% 0.014 258);
+  --ink-muted:       oklch(46% 0.017 258);
+  --ink-faint:       oklch(64% 0.014 258);
+
+  --accent:          oklch(56% 0.17 262);
+  --accent-strong:   oklch(47% 0.18 262);
+  --accent-tint:     oklch(95.5% 0.02 262);
+  --accent-tint-bd:  oklch(85% 0.05 262);
+
+  --violet:          oklch(50% 0.19 300);
+  --violet-tint:     oklch(95.5% 0.025 300);
+  --amber:           oklch(45% 0.14 70);
+  --amber-tint:      oklch(95.5% 0.05 80);
+  --rose:            oklch(50% 0.19 25);
+  --rose-tint:       oklch(96% 0.03 22);
+  --green:           oklch(47% 0.13 152);
+  --green-tint:      oklch(95.5% 0.04 152);
+
+  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  --text-xs:   0.75rem;
+  --text-sm:   0.8125rem;
+  --text-base: 0.875rem;
+  --text-body: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.5rem;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 999px;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 340ms;
+
+  --sidebar-w: 272px;
+  --chat-max: 46rem;
+
+  --z-sticky: 30; --z-overlay: 40; --z-modal: 50; --z-toast: 60;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   Reset & base
+   ──────────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-  height: 100%;
-  font-family: 'Inter', sans-serif;
+html, body { height: 100%; }
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--ink);
   background: var(--bg);
-  color: var(--text);
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { background: none; border: none; cursor: pointer; }
+ol, ul { list-style: none; }
+svg.i { width: 1em; height: 1em; flex-shrink: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-/* ─── Layout ─────────────────────────── */
-.app {
-  display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr var(--right-w);
-  grid-template-rows: 56px 1fr;
-  height: 100vh;
+a { color: var(--accent-strong); }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 
-/* ─── Topbar ─────────────────────────── */
-.topbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-.topbar-logo {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
+
+/* ────────────────────────────────────────────────────────────────────────
+   Icon buttons & generic buttons
+   ──────────────────────────────────────────────────────────────────────── */
+.icon-btn {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: var(--r-md);
+  color: var(--ink-muted);
   font-size: 17px;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  transition: background var(--dur-fast) var(--ease-out-quart), color var(--dur-fast);
 }
-.topbar-sep { width: 1px; height: 22px; background: var(--border); }
-.topbar-sub {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 300;
-}
-.topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
-.status-pill {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--muted);
-  padding: 4px 10px;
-  background: var(--surface2);
+.icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.icon-btn:active { background: var(--surface-active); }
+.icon-btn-sm { width: 26px; height: 26px; font-size: 14px; }
+
+.btn-ghost {
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-muted);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  transition: border-color var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
 }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
-.status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.btn-ghost:hover { border-color: var(--border-strong); color: var(--ink); background: var(--surface-hover); }
 
-/* ─── Sidebar ────────────────────────── */
-.sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.sidebar-section {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.sidebar-label {
-  font-size: 10px;
+.btn-primary {
+  padding: 8px 16px;
+  border-radius: var(--r-md);
+  font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: 1.5px;
-  color: var(--muted);
-  text-transform: uppercase;
-  margin-bottom: 10px;
-}
-.btn-new-conv {
-  width: 100%;
-  padding: 9px 14px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-family: 'Syne', sans-serif;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: opacity .15s;
-}
-.btn-new-conv:hover { opacity: .85; }
-
-.conv-list { flex: 1; overflow-y: auto; padding: 8px; }
-.conv-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background .12s;
-  position: relative;
-}
-.conv-item:hover { background: var(--surface2); }
-.conv-item.active { background: rgba(79,142,247,.12); }
-.conv-item.active::before {
-  content: '';
-  position: absolute; left: 0; top: 50%;
-  transform: translateY(-50%);
-  width: 3px; height: 60%;
+  color: var(--white);
   background: var(--accent);
-  border-radius: 0 2px 2px 0;
+  transition: background var(--dur-fast) var(--ease-out-quart);
 }
-.conv-name {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.conv-del {
-  opacity: 0;
-  background: none;
-  border: none;
-  color: var(--red);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: opacity .12s;
-}
-.conv-item:hover .conv-del { opacity: 1; }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; }
 
-/* model selector */
-.model-select {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.model-radio {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  transition: border-color .12s, background .12s;
-}
-.model-radio.selected {
-  border-color: var(--accent);
-  background: rgba(79,142,247,.07);
-}
-.model-radio input { display: none; }
-.model-icon { font-size: 16px; }
-.model-name { font-size: 12px; font-weight: 500; }
-.model-tag {
-  margin-left: auto;
-  font-size: 9px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 600;
-}
-.tag-gpt { background: rgba(79,142,247,.2); color: var(--accent); }
-.tag-gem { background: rgba(124,92,252,.2); color: var(--accent2); }
-
-/* stats */
-.stats-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.stat-card {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-}
-.stat-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--accent);
-}
-.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
-
-/* ─── Main chat ──────────────────────── */
-.main {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-right: 1px solid var(--border);
-}
-
-.chat-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.chat-title {
-  font-family: 'Syne', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-}
-.chat-meta { font-size: 11px; color: var(--muted); }
-.btn-reset {
-  margin-left: auto;
-  padding: 5px 12px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.btn-reset:hover { border-color: var(--amber); color: var(--amber); }
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.messages::-webkit-scrollbar { width: 4px; }
-.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* welcome */
-.welcome {
-  text-align: center;
-  padding: 40px 20px;
-}
-.welcome-icon { font-size: 48px; margin-bottom: 12px; }
-.welcome h2 {
-  font-family: 'Syne', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.welcome p { font-size: 13px; color: var(--muted); line-height: 1.6; }
-.welcome-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 20px;
-}
-.chip {
-  padding: 6px 14px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.chip:hover { border-color: var(--accent); color: var(--accent); }
-
-/* message bubbles */
-.msg { display: flex; gap: 12px; max-width: 88%; }
-.msg.user { align-self: flex-end; flex-direction: row-reverse; }
-.msg-avatar {
-  width: 34px; height: 34px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-.msg.user .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
-.msg.bot  .msg-avatar { background: var(--surface2); border: 1px solid var(--border); }
-.msg-body { flex: 1; }
-.msg-bubble {
-  padding: 12px 16px;
-  border-radius: 14px;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.msg.user .msg-bubble {
-  background: linear-gradient(135deg, rgba(79,142,247,.18), rgba(124,92,252,.18));
-  border: 1px solid rgba(79,142,247,.25);
-  border-radius: 14px 4px 14px 14px;
-}
-.msg.bot .msg-bubble {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px 14px 14px 14px;
-}
-.msg-meta {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 5px;
-}
-.msg-time { font-size: 10px; color: var(--muted); }
-.msg-source {
-  font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 10px;
-  font-weight: 500;
-}
-.src-db     { background: rgba(79,142,247,.15); color: var(--accent); }
-.src-rag    { background: rgba(124,92,252,.15); color: var(--accent2); }
-.src-web    { background: rgba(251,191,36,.15); color: var(--amber); }
-.src-sys    { background: rgba(100,116,139,.15); color: var(--muted); }
-.src-chat   { background: rgba(52,211,153,.15); color: var(--green); }
-.src-tokens { background: rgba(79,142,247,.08); border: 1px dashed rgba(79,142,247,.25); color: var(--accent); }
-
-/* intent badge */
-.intent-badge {
-  font-size: 9px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  letter-spacing: .5px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.intent-DB_QUERY { background: rgba(79,142,247,.15); color: var(--accent); }
-.intent-SEARCH   { background: rgba(251,191,36,.15); color: var(--amber); }
-.intent-META     { background: rgba(100,116,139,.15); color: var(--muted); }
-.intent-GENERAL  { background: rgba(52,211,153,.15); color: var(--green); }
-.intent-RAG      { background: rgba(124,92,252,.15); color: var(--accent2); }
-.intent-GUARDRAIL { background: rgba(248,113,113,.15); color: var(--red); }
-
-/* typing animation */
-.typing-bubble {
-  display: flex; align-items: center; gap: 5px;
-  padding: 12px 18px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px 14px 14px 14px;
-  width: fit-content;
-}
-.typing-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--muted);
-  animation: bounce 1.2s infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: .2s; }
-.typing-status {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-  min-height: 14px;
-}
-.typing-dot:nth-child(3) { animation-delay: .4s; }
-@keyframes bounce {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-6px); }
-}
-
-/* input area */
-.input-area {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-}
-.input-wrap {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px 12px;
-  transition: border-color .15s;
-}
-.input-wrap:focus-within { border-color: var(--accent); }
-#msgInput {
-  flex: 1;
-  background: none;
-  border: none;
-  outline: none;
-  color: var(--text);
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  resize: none;
-  max-height: 140px;
-  line-height: 1.5;
-}
-#msgInput::placeholder { color: var(--muted); }
-.btn-send {
-  width: 36px; height: 36px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border: none;
-  border-radius: 10px;
-  color: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px;
-  transition: opacity .12s, transform .12s;
-  flex-shrink: 0;
-}
-.btn-send:hover { opacity: .85; transform: scale(1.05); }
-.btn-send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-
-/* ─── Right panel ────────────────────── */
-.right-panel {
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.panel-section {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.panel-section.grow { flex: 1; overflow-y: auto; }
-.panel-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-/* dropzone */
-.dropzone {
-  border: 2px dashed var(--border);
-  border-radius: 10px;
-  padding: 24px 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-  position: relative;
-}
-.dropzone:hover, .dropzone.drag-over {
-  border-color: var(--accent);
-  background: rgba(79,142,247,.05);
-}
-.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.dropzone-icon { font-size: 28px; margin-bottom: 8px; }
-.dropzone-text { font-size: 12px; color: var(--muted); }
-.dropzone-hint { font-size: 10px; color: var(--muted); margin-top: 4px; opacity: .6; }
-
-.btn-upload {
-  width: 100%;
-  margin-top: 10px;
-  padding: 9px;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity .12s;
-}
-.btn-upload:hover { opacity: .85; }
-.btn-upload:disabled { opacity: .4; cursor: not-allowed; }
-
-.doc-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.doc-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 12px;
-}
-.doc-icon { font-size: 14px; }
-.doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.doc-del {
-  background: none; border: none;
-  color: var(--red); cursor: pointer;
-  font-size: 12px; padding: 2px;
-  opacity: .6; transition: opacity .12s;
-}
-.doc-del:hover { opacity: 1; }
-
-/* crawler */
-.crawl-input {
-  width: 100%;
-  padding: 9px 12px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 12px;
-  outline: none;
-  transition: border-color .12s;
-}
-.crawl-input:focus { border-color: var(--accent); }
-.crawl-row {
-  display: flex; gap: 8px; align-items: center;
-  margin-top: 8px;
-}
-.crawl-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.crawl-range { flex: 1; accent-color: var(--accent); }
-.crawl-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--accent);
-  width: 24px;
-}
-.btn-crawl {
-  width: 100%;
-  margin-top: 10px;
-  padding: 9px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.btn-crawl:hover { border-color: var(--accent); color: var(--accent); }
-
-/* toast */
-.toast-area {
-  position: fixed; top: 68px; right: 16px;
-  display: flex; flex-direction: column; gap: 8px;
-  z-index: 999; pointer-events: none;
-}
-.toast {
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  box-shadow: 0 4px 20px rgba(0,0,0,.4);
-  animation: slideIn .2s ease;
-  pointer-events: all;
-}
-@keyframes slideIn {
-  from { transform: translateX(40px); opacity: 0; }
-  to   { transform: translateX(0);   opacity: 1; }
-}
-.toast.ok  { background: rgba(52,211,153,.15); border: 1px solid rgba(52,211,153,.3); color: var(--green); }
-.toast.err { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.3); color: var(--red); }
-.toast.inf { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
-
-/* loading overlay */
+/* ────────────────────────────────────────────────────────────────────────
+   Loader
+   ──────────────────────────────────────────────────────────────────────── */
 #loader {
-  position: fixed; inset: 0;
+  position: fixed; inset: 0; z-index: var(--z-modal);
   background: var(--bg);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 16px; z-index: 9999;
-  transition: opacity .4s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-4);
+  transition: opacity var(--dur-slow) var(--ease-out-quart);
 }
 #loader.hidden { opacity: 0; pointer-events: none; }
-.loader-logo {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800; font-size: 28px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.loader-mark { display: flex; align-items: center; gap: 10px; }
+.loader-mark svg { width: 22px; height: 22px; color: var(--accent); }
+.loader-mark span { font-weight: 600; font-size: var(--text-lg); letter-spacing: -0.01em; }
+.loader-bar { width: 180px; height: 3px; background: var(--border); border-radius: var(--r-full); overflow: hidden; }
+.loader-bar-fill {
+  height: 100%; width: 40%;
+  background: var(--accent);
+  border-radius: var(--r-full);
+  animation: loaderSlide 1.1s var(--ease-out-quart) infinite;
 }
-.loader-bar {
-  width: 200px; height: 3px;
-  background: var(--surface2);
-  border-radius: 2px;
+@keyframes loaderSlide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.loader-msg { font-size: var(--text-sm); color: var(--ink-muted); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Login screen
+   ──────────────────────────────────────────────────────────────────────── */
+.login-screen {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-screen[hidden] { display: none; }
+.login-card {
+  width: min(360px, 90vw);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+}
+.login-mark { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: var(--sp-2); }
+.login-mark svg { width: 26px; height: 26px; color: var(--accent); }
+.login-mark span { font-weight: 600; font-size: var(--text-lg); letter-spacing: -0.01em; }
+.login-field { display: flex; flex-direction: column; gap: 6px; }
+.login-error {
+  font-size: var(--text-sm); color: var(--rose);
+  background: var(--rose-tint);
+  border: 1px solid oklch(88% 0.06 22);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  display: none;
+}
+.login-error.visible { display: block; }
+.login-submit { width: 100%; padding: 10px; font-size: var(--text-sm); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Toasts
+   ──────────────────────────────────────────────────────────────────────── */
+.toast-area {
+  position: fixed; top: var(--sp-4); right: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  z-index: var(--z-toast);
+}
+.toast {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: var(--white);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px -8px oklch(22% 0.014 258 / 0.18);
+  animation: toastIn var(--dur-base) var(--ease-out-quart);
+  max-width: 320px;
+}
+@keyframes toastIn {
+  from { transform: translateY(-6px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.toast.ok  { border-color: var(--green-tint); color: var(--green); background: var(--green-tint); }
+.toast.err { border-color: var(--rose-tint); color: var(--rose); background: var(--rose-tint); }
+.toast.inf { color: var(--ink); }
+.toast-action {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  flex-shrink: 0;
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Drag & drop overlay
+   ──────────────────────────────────────────────────────────────────────── */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: var(--z-overlay);
+  background: oklch(98.4% 0.003 250 / 0.92);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center; justify-content: center;
+}
+.drop-overlay.active { display: flex; }
+.drop-overlay-inner {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-7);
+  border: 2px dashed var(--accent);
+  border-radius: var(--r-xl);
+  color: var(--accent-strong);
+}
+.drop-overlay-inner svg { width: 32px; height: 32px; }
+.drop-overlay-inner p { font-weight: 600; font-size: var(--text-lg); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Shell layout
+   ──────────────────────────────────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: 100vh;
   overflow: hidden;
 }
-.loader-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent2));
-  border-radius: 2px;
-  animation: loadFill 2.5s ease-in-out forwards;
-}
-@keyframes loadFill {
-  0%   { width: 0%; }
-  60%  { width: 70%; }
-  100% { width: 100%; }
-}
-.loader-msg { font-size: 13px; color: var(--muted); }
 
-/* scrollbar styles */
-.conv-list::-webkit-scrollbar,
-.panel-section.grow::-webkit-scrollbar { width: 3px; }
-.conv-list::-webkit-scrollbar-thumb,
-.panel-section.grow::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: oklch(22% 0.014 258 / 0.35);
+  z-index: var(--z-overlay);
+}
+.sidebar-backdrop.active { display: block; }
 
-/* markdown-like formatting in messages */
-.msg-bubble strong { font-weight: 600; }
-.msg-bubble code {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  background: rgba(255,255,255,.07);
+/* ────────────────────────────────────────────────────────────────────────
+   Sidebar
+   ──────────────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left var(--dur-slow) var(--ease-out-quart);
+}
+.sidebar.collapsed { margin-left: calc(var(--sidebar-w) * -1); }
+
+.sidebar-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--sp-4) var(--sp-3) var(--sp-2);
+}
+.brand { display: flex; align-items: center; gap: 8px; padding-left: 4px; }
+.brand svg { width: 18px; height: 18px; color: var(--accent); }
+.brand span { font-weight: 600; font-size: var(--text-base); letter-spacing: -0.01em; }
+
+.btn-new {
+  display: flex; align-items: center; gap: 8px;
+  margin: var(--sp-2) var(--sp-3);
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.btn-new:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.btn-new svg { width: 15px; height: 15px; }
+
+.conv-list {
+  flex: 1; overflow-y: auto;
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.conv-list::-webkit-scrollbar { width: 4px; }
+.conv-list::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--r-full); }
+
+.conv-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  position: relative;
+}
+.conv-item:hover { background: var(--surface-hover); }
+.conv-item.active { background: var(--accent-tint); }
+.conv-item.active .conv-name { color: var(--accent-strong); font-weight: 500; }
+.conv-name {
+  flex: 1; font-size: var(--text-sm); color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.conv-del {
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border-radius: var(--r-sm); color: var(--ink-faint);
+  opacity: 0; transition: opacity var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+  flex-shrink: 0;
+}
+.conv-item:hover .conv-del, .conv-del:focus-visible { opacity: 1; }
+.conv-del:hover { color: var(--rose); background: var(--rose-tint); }
+.conv-del svg { width: 13px; height: 13px; }
+
+.sidebar-bottom {
+  border-top: 1px solid var(--border);
+  padding: var(--sp-4) var(--sp-3);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+}
+
+.model-select-btn {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.model-select-btn:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.model-select-label { font-size: var(--text-base); font-weight: 600; flex: 1; }
+.model-select-chevron { width: 14px; height: 14px; color: var(--ink-faint); flex-shrink: 0; transform: rotate(90deg); }
+
+/* .model-menu-opt is a button inside .attach-menu — width/padding/font-size/
+   hover already come from the ".attach-menu button" rule below; this only
+   adds what that rule doesn't provide. */
+.model-menu-opt { justify-content: space-between; }
+.model-menu-opt.selected { color: var(--accent-strong); font-weight: 600; }
+.model-opt-tag { font-size: var(--text-xs); color: var(--ink-faint); font-family: var(--font-mono); }
+
+.compare-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: var(--text-base); color: var(--ink-muted);
+  cursor: pointer;
+}
+.compare-row input { accent-color: var(--accent); width: 17px; height: 17px; }
+
+.btn-files {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.btn-files:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.btn-files svg { width: 16px; height: 16px; color: var(--ink-faint); flex-shrink: 0; }
+
+.status-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--text-sm); color: var(--ink-faint);
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
+.status-dot.online { background: var(--green); }
+.status-sep { opacity: .5; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Chat shell
+   ──────────────────────────────────────────────────────────────────────── */
+.chat-shell {
+  flex: 1;
+  display: flex; flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.chat-topbar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.chat-topbar-title {
+  font-size: var(--text-sm); font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chat-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--sp-2); }
+.cost-pill {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+#sidebarToggleMobile, #expandSidebarBtn { display: none; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Messages
+   ──────────────────────────────────────────────────────────────────────── */
+.messages {
+  flex: 1; overflow-y: auto;
+  padding: var(--sp-6) var(--sp-4) var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-5);
+  scroll-behavior: smooth;
+}
+.messages::-webkit-scrollbar { width: 6px; }
+.messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--r-full); }
+
+.welcome {
+  max-width: var(--chat-max); margin: var(--sp-7) auto 0;
+  text-align: center;
+  animation: welcomeIn var(--dur-slow) var(--ease-out-expo);
+}
+@keyframes welcomeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.welcome-mark { width: 40px; height: 40px; margin: 0 auto var(--sp-4); color: var(--accent); }
+.welcome h1 { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.01em; margin-bottom: var(--sp-2); }
+.welcome p { font-size: var(--text-base); color: var(--ink-muted); line-height: 1.6; max-width: 46ch; margin: 0 auto; }
+.welcome-chips {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  justify-content: center; margin-top: var(--sp-5);
+}
+.chip {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  transition: border-color var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+}
+.chip:hover { border-color: var(--accent-tint-bd); color: var(--accent-strong); background: var(--accent-tint); }
+
+.msg { display: flex; gap: var(--sp-3); max-width: var(--chat-max); width: 100%; margin: 0 auto; }
+.msg.user { justify-content: flex-end; }
+.msg.system { justify-content: center; }
+
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: var(--r-md);
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--accent);
+}
+.msg-avatar svg { width: 15px; height: 15px; }
+
+.msg-body { flex: 1; min-width: 0; }
+.msg.user .msg-body { flex: none; max-width: 80%; }
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  font-size: var(--text-body);
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+.bubble-user {
+  background: var(--accent);
+  color: var(--white);
+  border-radius: var(--r-lg) var(--r-sm) var(--r-lg) var(--r-lg);
+}
+.msg.bot .bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm) var(--r-lg) var(--r-lg) var(--r-lg);
+}
+.bubble-error {
+  background: var(--rose-tint);
+  border-color: oklch(85% 0.06 22) !important;
+  color: var(--rose);
+}
+.bubble strong { font-weight: 600; }
+.bubble code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: oklch(0% 0 0 / 0.05);
   padding: 1px 5px;
   border-radius: 4px;
 }
-
-/* comparison mode */
-.compare-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 5px;
-  margin-bottom: 5px;
+.bubble a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.bubble ul, .bubble ol { margin: 6px 0; padding-left: 1.4em; }
+.bubble li { margin: 2px 0; }
+.bubble li::marker { color: var(--ink-faint); }
+.msg-table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 0.92em;
   width: 100%;
+  overflow-x: auto;
+  display: block;
 }
-.compare-box {
-  background: var(--surface);
+.msg-table th, .msg-table td {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  padding: 5px 10px;
+  text-align: left;
 }
-.compare-header {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  text-transform: uppercase;
-  letter-spacing: .5px;
+.msg-table thead { display: table-header-group; }
+.msg-table tbody { display: table-row-group; }
+.msg-table tr { display: table-row; }
+.msg-table th { background: var(--surface); font-weight: 600; }
+
+.msg-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-top: 6px; padding-left: 2px;
 }
-.compare-box.rag-box {
-  border-color: rgba(52,211,153,.25);
+.msg.user .msg-meta { justify-content: flex-end; padding-right: 2px; padding-left: 0; }
+.msg-time { font-size: var(--text-xs); color: var(--ink-faint); }
+.tag {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--r-full);
+  letter-spacing: 0.01em;
 }
-.compare-box.rag-box .compare-header {
-  color: var(--green);
-  background: rgba(52,211,153,.05);
+.tag-db     { background: var(--accent-tint); color: var(--accent-strong); }
+.tag-rag    { background: var(--violet-tint); color: var(--violet); }
+.tag-web    { background: var(--amber-tint); color: var(--amber); }
+.tag-sys    { background: var(--surface-active); color: var(--ink-muted); }
+.tag-chat   { background: var(--green-tint); color: var(--green); }
+.tag-mono   { font-family: var(--font-mono); background: var(--surface-active); color: var(--ink-faint); font-weight: 500; }
+
+/* system notes (upload / crawl confirmations) */
+.system-note {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 13px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
 }
-.compare-box.norag-box {
-  border-color: rgba(248,113,113,.25);
+.system-note svg { width: 13px; height: 13px; flex-shrink: 0; }
+.system-note.pending svg { color: var(--accent); animation: spin 0.8s linear infinite; }
+.system-note.done svg { color: var(--green); }
+.system-note.error { color: var(--rose); border-color: oklch(90% 0.05 22); background: var(--rose-tint); }
+.system-note.error svg { color: var(--rose); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Step block (live orchestrator trace)
+   ──────────────────────────────────────────────────────────────────────── */
+.step-block { margin-bottom: var(--sp-2); }
+.step-summary {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm); color: var(--ink-muted); font-weight: 500;
+  padding: 4px 2px;
+  user-select: none;
 }
-.compare-box.norag-box .compare-header {
-  color: var(--red);
-  background: rgba(248,113,113,.05);
+.step-summary::-webkit-details-marker { display: none; }
+.step-chevron { width: 13px; height: 13px; transition: transform var(--dur-fast) var(--ease-out-quart); }
+.step-block[open] .step-chevron { transform: rotate(90deg); }
+
+.step-list {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-1);
+  margin-bottom: var(--sp-2);
+  border-left: 1px solid var(--border);
+  margin-left: 7px;
 }
-.compare-box .msg-bubble {
-  border: none !important;
-  border-radius: 0 !important;
+.step-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0 4px 14px;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  transition: color var(--dur-base);
+}
+.step-item.active, .step-item.done { color: var(--ink); }
+.step-icon {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  position: relative;
+  display: grid; place-items: center;
+}
+.step-item.active .step-icon { border-color: var(--accent-tint-bd); }
+.step-item.active .step-icon::after {
+  content: ''; position: absolute; inset: -1.5px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-item.active .step-icon::after { animation: none; border-top-color: var(--accent); opacity: .6; }
+}
+.step-item.done .step-icon { border-color: var(--green); background: var(--green); }
+.step-check { width: 9px; height: 9px; color: var(--white); display: none; }
+.step-item.done .step-check { display: block; }
+.step-source { margin-left: auto; font-size: var(--text-xs); color: var(--ink-faint); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Compare mode
+   ──────────────────────────────────────────────────────────────────────── */
+.compare-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+}
+.compare-col { display: flex; flex-direction: column; }
+.compare-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 5px 12px;
+  border: 1px solid var(--border); border-bottom: none;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+}
+.compare-label.rag   { color: var(--green);  background: var(--green-tint); border-color: oklch(88% 0.06 152); }
+.compare-label.norag { color: var(--rose);   background: var(--rose-tint);  border-color: oklch(88% 0.06 22); }
+.compare-col .bubble { border-radius: 0 0 var(--r-md) var(--r-md) !important; margin: 0; }
+@media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Composer
+   ──────────────────────────────────────────────────────────────────────── */
+.composer-area {
+  flex-shrink: 0;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+.composer {
+  max-width: var(--chat-max); margin: 0 auto;
+  display: flex; align-items: flex-end; gap: 4px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 7px 7px 7px 10px;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.composer:focus-within { border-color: var(--accent-tint-bd); box-shadow: 0 0 0 3px var(--accent-tint); }
+#msgInput {
   flex: 1;
-  background: none !important;
-  padding: 10px 12px !important;
+  border: none; outline: none; resize: none;
+  background: none;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  max-height: 160px;
+  padding: 7px 4px;
 }
-.tag-gray {
-  background: rgba(100,116,139,.15);
-  color: var(--muted);
+#msgInput::placeholder { color: var(--ink-faint); }
+
+.btn-send {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--white);
+  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-out-quart);
 }
-@media (max-width: 900px) {
-  .compare-container {
-    grid-template-columns: 1fr;
+.btn-send svg { width: 16px; height: 16px; }
+.btn-send:hover:not(:disabled) { background: var(--accent-strong); transform: scale(1.05); }
+.btn-send:disabled { opacity: .35; cursor: not-allowed; }
+
+.docs-pill {
+  width: auto; padding: 0 10px; gap: 5px;
+  display: none; align-items: center;
+  border-radius: var(--r-full);
+  font-size: var(--text-xs); font-weight: 500;
+}
+.docs-pill[data-visible="true"] { display: flex; }
+.docs-pill svg { width: 13px; height: 13px; }
+
+.composer-hint {
+  text-align: center; font-size: 11px; color: var(--ink-faint);
+  margin-top: var(--sp-2);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Popovers (attach menu / docs menu)
+   ──────────────────────────────────────────────────────────────────────── */
+[popover] {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--white);
+  box-shadow: 0 12px 32px -12px oklch(22% 0.014 258 / 0.22);
+  padding: 6px;
+  margin: 0;
+  inset: unset;
+}
+[popover]:popover-open { animation: popIn var(--dur-fast) var(--ease-out-quart); }
+@keyframes popIn { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.attach-menu { width: 200px; }
+.attach-menu button {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  font-size: var(--text-sm); color: var(--ink);
+  text-align: left;
+}
+.attach-menu button:hover { background: var(--surface-hover); }
+.attach-menu svg { width: 15px; height: 15px; color: var(--ink-muted); }
+
+.docs-menu { width: 260px; max-height: 320px; }
+.docs-menu-title {
+  font-size: var(--text-xs); font-weight: 600; color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 6px 8px;
+}
+.doc-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: 260px; }
+.doc-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--r-md);
+  font-size: var(--text-sm);
+}
+.doc-row:hover { background: var(--surface-hover); }
+.doc-row svg { width: 14px; height: 14px; color: var(--ink-faint); flex-shrink: 0; }
+.doc-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-empty { font-size: var(--text-sm); color: var(--ink-faint); padding: var(--sp-2) var(--sp-2); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Crawl dialog
+   ──────────────────────────────────────────────────────────────────────── */
+dialog {
+  border: none; border-radius: var(--r-xl);
+  padding: 0; width: min(380px, 92vw);
+  box-shadow: 0 24px 64px -16px oklch(22% 0.014 258 / 0.3);
+}
+dialog::backdrop { background: oklch(22% 0.014 258 / 0.4); }
+dialog[open] { animation: dialogIn var(--dur-base) var(--ease-out-quart); }
+@keyframes dialogIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.dialog-body { padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+.dialog-body h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: 2px; }
+.field-label { font-size: var(--text-sm); font-weight: 500; color: var(--ink-muted); }
+.field-input {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  font-size: var(--text-sm); outline: none;
+  transition: border-color var(--dur-fast);
+}
+.field-input:focus { border-color: var(--accent); }
+.range-row { display: flex; align-items: center; gap: 10px; }
+.range-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.range-val { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--accent-strong); width: 28px; text-align: right; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+
+.files-upload-row { display: flex; gap: 8px; }
+.files-upload-row .btn-ghost { flex: 1; }
+.files-group-title {
+  font-size: var(--text-xs); font-weight: 600; color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  margin: var(--sp-2) 0 4px;
+}
+.files-group .doc-list { max-height: 160px; overflow-y: auto; }
+.files-group .doc-row { gap: 6px; }
+.files-group .doc-row-name { min-width: 0; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Responsive
+   ──────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: var(--z-overlay);
+    transform: translateX(-100%);
+    transition: transform var(--dur-slow) var(--ease-out-quart);
+    margin-left: 0 !important;
   }
+  .sidebar.mobile-open { transform: translateX(0); }
+  #sidebarToggleMobile { display: grid; }
+  .chat-topbar { padding-left: var(--sp-2); }
+  .msg.user .msg-body { max-width: 92%; }
+  .compare-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 861px) {
+  .sidebar.collapsed + .sidebar-backdrop { display: none; }
 }
 </style>
 </head>
 <body>
 
+<!-- Icon sprite -->
+<svg class="sr-only" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="5" r="2.2"/><circle cx="5.5" cy="17" r="2.2"/><circle cx="18.5" cy="17" r="2.2"/>
+      <path d="M12 7.2v3.3M10.2 12.3 7 15.2M13.8 12.3 17 15.2"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-.8 12.2A2 2 0 0 1 15.2 21H8.8a2 2 0 0 1-2-1.8L6 7"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12.6 12 21a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 19a2 2 0 0 1-3-3l7.5-7.5"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-sidebar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></symbol>
+    <symbol id="i-loader" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.5 17.5A1.5 1.5 0 0 0 3.8 20h16.4a1.5 1.5 0 0 0 1.3-2.5L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/></symbol>
+  </defs>
+</svg>
+
 <!-- Loading overlay -->
 <div id="loader">
-  <div class="loader-logo">🎓 AkademikBot</div>
+  <div class="loader-mark"><svg><use href="#i-mark"></use></svg><span>Akademik Asistan</span></div>
   <div class="loader-bar"><div class="loader-bar-fill"></div></div>
-  <div class="loader-msg" id="loaderMsg">Sistem başlatılıyor...</div>
+  <div class="loader-msg" id="loaderMsg">Sistem başlatılıyor…</div>
 </div>
 
-<!-- Toast area -->
-<div class="toast-area" id="toastArea"></div>
-
-<div class="app">
-
-  <!-- ── Topbar ── -->
-  <header class="topbar">
-    <span class="topbar-logo">🎓 AkademikBot</span>
-    <div class="topbar-sep"></div>
-    <span class="topbar-sub">RAG + Agentic + Text-SQL</span>
-    <div class="topbar-right">
-      <div class="status-pill">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="statusText">Bağlanıyor...</span>
-      </div>
-      <div class="status-pill">
-        <span>🪙</span>
-        <span id="topbarTokens">0 token</span>
-      </div>
+<div class="login-screen" id="loginScreen" hidden>
+  <form class="login-card" id="loginForm">
+    <div class="login-mark"><svg><use href="#i-mark"></use></svg><span>Akademik Asistan</span></div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-field">
+      <label class="field-label" for="loginEmail">E-posta</label>
+      <input type="email" id="loginEmail" class="field-input" autocomplete="username" required>
     </div>
-  </header>
-
-  <!-- ── Sidebar ── -->
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <button class="btn-new-conv" onclick="newConv()">➕ Yeni Sohbet</button>
+    <div class="login-field">
+      <label class="field-label" for="loginPassword">Şifre</label>
+      <input type="password" id="loginPassword" class="field-input" autocomplete="current-password" required>
     </div>
+    <button type="submit" class="btn-primary login-submit" id="loginSubmitBtn">Giriş yap</button>
+  </form>
+</div>
 
-    <div class="conv-list" id="convList"></div>
+<div class="toast-area" id="toastArea" aria-live="polite"></div>
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay-inner"><svg><use href="#i-file"></use></svg><p>Belgeyi buraya bırakın</p></div>
+</div>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">Model</div>
-      <div class="model-select">
-        <label class="model-radio selected" id="radioGpt" onclick="selectModel('chatgpt')">
-          <input type="radio" name="model" value="chatgpt" checked>
-          <span class="model-icon">🤖</span>
-          <span class="model-name">ChatGPT</span>
-          <span class="model-tag tag-gpt">gpt-4o-mini</span>
-        </label>
-        <label class="model-radio" id="radioGem" onclick="selectModel('gemini')">
-          <input type="radio" name="model" value="gemini">
-          <span class="model-icon">✨</span>
-          <span class="model-name">Gemini</span>
-          <span class="model-tag tag-gem">flash</span>
-        </label>
-      </div>
+<div class="shell">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="brand"><svg><use href="#i-mark"></use></svg><span>Akademik Asistan</span></div>
+      <button class="icon-btn" id="collapseSidebarBtn" aria-label="Kenar çubuğunu daralt">
+        <svg class="i"><use href="#i-sidebar"></use></svg>
+      </button>
     </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">Analiz Modu</div>
-      <div class="model-select">
-        <div class="model-radio" id="compareToggle" onclick="toggleCompareMode()">
-          <span class="model-icon">⚖️</span>
-          <span class="model-name">RAG Karşılaştırma</span>
-          <span class="model-tag tag-gray" id="compareTag">Kapalı</span>
-        </div>
-      </div>
-    </div>
+    <button class="btn-new" id="newConvBtn"><svg><use href="#i-plus"></use></svg>Yeni sohbet</button>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">Oturum İstatistikleri</div>
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-val" id="sidebarTokens">0</div>
-          <div class="stat-lbl">Token</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="sidebarCost">$0.00000</div>
-          <div class="stat-lbl">Maliyet</div>
-        </div>
+    <nav class="conv-list" id="convList" aria-label="Sohbetler"></nav>
+
+    <div class="sidebar-bottom">
+      <button class="model-select-btn" id="modelSelectBtn" popovertarget="modelMenu" aria-haspopup="true">
+        <span class="model-select-label" id="modelSelectLabel">ChatGPT</span>
+        <span class="model-opt-tag" id="modelSelectTag">gpt-4o-mini</span>
+        <svg class="i model-select-chevron"><use href="#i-chevron-right"></use></svg>
+      </button>
+      <div id="modelMenu" popover class="attach-menu" style="width:220px;">
+        <button type="button" class="model-menu-opt selected" id="modelOptGpt" data-model="chatgpt">
+          <span>ChatGPT</span><span class="model-opt-tag">gpt-4o-mini</span>
+        </button>
+        <button type="button" class="model-menu-opt" id="modelOptGem" data-model="gemini">
+          <span>Gemini</span><span class="model-opt-tag">flash</span>
+        </button>
+      </div>
+      <label class="compare-row">
+        <input type="checkbox" id="compareToggle">
+        RAG karşılaştırma modu
+      </label>
+      <button class="btn-files" id="filesManageBtn"><svg class="i"><use href="#i-folder"></use></svg>Yüklü Dosyalar</button>
+      <div class="status-row">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Bağlanıyor…</span>
+        <span class="status-sep">·</span>
+        <span id="sidebarTokens" class="mono">0</span>&nbsp;token
+      </div>
+      <div class="status-row">
+        <span id="sidebarEmail" class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <span class="status-sep">·</span>
+        <button class="btn-ghost" id="logoutBtn" style="padding:2px 8px;">Çıkış yap</button>
       </div>
     </div>
   </aside>
 
-  <!-- ── Main chat ── -->
-  <main class="main">
-    <div class="chat-header">
-      <div>
-        <div class="chat-title" id="chatTitle">Sohbet 1</div>
-        <div class="chat-meta" id="chatMeta">0 mesaj</div>
+  <main class="chat-shell">
+    <header class="chat-topbar">
+      <button class="icon-btn" id="sidebarToggleMobile" aria-label="Menüyü aç"><svg class="i"><use href="#i-menu"></use></svg></button>
+      <button class="icon-btn" id="expandSidebarBtn" aria-label="Kenar çubuğunu genişlet"><svg class="i"><use href="#i-sidebar"></use></svg></button>
+      <div class="chat-topbar-title" id="chatTitle">Sohbet 1</div>
+      <div class="chat-topbar-actions">
+        <span class="cost-pill" id="costPill">$0.00000</span>
+        <button class="btn-ghost" id="resetBtn">Sıfırla</button>
       </div>
-      <button class="btn-reset" onclick="resetConv()">🔄 Sıfırla</button>
-    </div>
+    </header>
 
     <div class="messages" id="messages">
       <div class="welcome" id="welcomeScreen">
-        <div class="welcome-icon">🎓</div>
-        <h2>Akademik Chatbot'a Hoşgeldiniz</h2>
-        <p>Öğrenci/ders sorguları, belge analizi,<br>internet araması ve genel sorularınız için buradayım.</p>
+        <svg class="welcome-mark"><use href="#i-mark"></use></svg>
+        <h1>Akademik Asistan'a hoş geldiniz</h1>
+        <p>Öğrenci ve ders sorguları, yüklediğiniz belgeler, web araması ve genel sorularınız için buradayım.</p>
         <div class="welcome-chips">
-          <div class="chip" onclick="sendChip('Okulda kaç öğrenci var?')">📊 Öğrenci sayısı</div>
-          <div class="chip" onclick="sendChip('Hangi bölümler var?')">🏫 Bölümler</div>
-          <div class="chip" onclick="sendChip('Yapay Zeka dersini kim veriyor?')">👨‍🏫 Ders sorgusu</div>
-          <div class="chip" onclick="sendChip('Yüklü belgeler neler?')">📄 Belgeler</div>
-          <div class="chip" onclick="sendChip('Yapay zeka nedir?')">🌐 İnternet araması</div>
+          <button class="chip" data-chip="Okulda kaç öğrenci var?">Öğrenci sayısı</button>
+          <button class="chip" data-chip="Hangi bölümler var?">Bölümler</button>
+          <button class="chip" data-chip="Yapay Zeka dersini kim veriyor?">Ders sorgusu</button>
+          <button class="chip" data-chip="Yüklü belgeler neler?">Belgeler</button>
+          <button class="chip" data-chip="Yapay zeka nedir?">İnternet araması</button>
         </div>
       </div>
     </div>
 
-    <div class="input-area">
-      <div class="input-wrap">
-        <textarea id="msgInput"
-          rows="1"
-          placeholder="Mesajınızı yazın... (Enter göndermek için, Shift+Enter yeni satır)"
-          onkeydown="handleKey(event)"
-          oninput="autoResize(this)"></textarea>
-        <button class="btn-send" id="sendBtn" onclick="sendMessage()">➤</button>
+    <div class="composer-area">
+      <div class="composer" id="composer">
+        <button class="icon-btn" id="attachBtn" popovertarget="attachMenu" aria-label="Belge ekle">
+          <svg class="i"><use href="#i-paperclip"></use></svg>
+        </button>
+        <div id="attachMenu" popover class="attach-menu">
+          <button type="button" id="attachFileOpt"><svg><use href="#i-file"></use></svg>Dosya yükle</button>
+          <button type="button" id="attachUrlOpt"><svg><use href="#i-globe"></use></svg>Web sitesi tara</button>
+        </div>
+        <input type="file" id="fileInput" multiple hidden accept=".pdf,.xlsx,.xls,.txt">
+
+        <textarea id="msgInput" rows="1" placeholder="Bir şey sorun…" aria-label="Mesaj"></textarea>
+
+        <button class="icon-btn docs-pill" id="docsPill" popovertarget="docsMenu" aria-label="Yüklü belgeler">
+          <svg><use href="#i-file"></use></svg><span id="docsCount">0</span>
+        </button>
+        <div id="docsMenu" popover class="docs-menu">
+          <div class="docs-menu-title">Yüklü belgeler</div>
+          <div id="docList" class="doc-list"></div>
+        </div>
+
+        <button class="btn-send" id="sendBtn" aria-label="Gönder"><svg><use href="#i-arrow-up"></use></svg></button>
       </div>
+      <p class="composer-hint">Enter ile gönder · Shift+Enter yeni satır · dosyayı sürükleyip bırakabilirsiniz</p>
     </div>
   </main>
 
-  <!-- ── Right panel ── -->
-  <aside class="right-panel">
-    <div class="panel-section">
-      <div class="panel-title">📄 Belge Yükle</div>
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.txt" onchange="filesSelected()">
-        <div class="dropzone-icon">📁</div>
-        <div class="dropzone-text">PDF, XLSX, XLS veya TXT sürükleyin</div>
-        <div class="dropzone-hint">veya tıklayarak seçin</div>
-      </div>
-      <div id="selectedFiles" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
-      <button class="btn-upload" id="uploadBtn" onclick="uploadFiles()" disabled>Sisteme Yükle</button>
-    </div>
-
-    <div class="panel-section grow">
-      <div class="panel-title">🗂️ Yüklü Belgeler</div>
-      <div class="doc-list" id="docList">
-        <div style="font-size:12px;color:var(--muted);">Henüz belge yüklenmedi.</div>
-      </div>
-    </div>
-
-    <div class="panel-section">
-      <div class="panel-title">🌐 Web Sitesi Tara</div>
-      <input type="text" class="crawl-input" id="crawlUrl" placeholder="https://site.com">
-      <div class="crawl-row">
-        <span class="crawl-label">Maks. sayfa:</span>
-        <input type="range" class="crawl-range" id="crawlPages" min="5" max="100" value="30" step="5" oninput="document.getElementById('crawlPageVal').textContent=this.value">
-        <span class="crawl-val" id="crawlPageVal">30</span>
-      </div>
-      <button class="btn-crawl" onclick="crawlSite()">🕷️ Siteyi Tara</button>
-    </div>
-  </aside>
-
 </div>
 
+<dialog id="crawlDialog" aria-labelledby="crawlDialogTitle">
+  <form class="dialog-body" method="dialog" id="crawlForm">
+    <h3 id="crawlDialogTitle">Web sitesi tara</h3>
+    <div>
+      <label class="field-label" for="crawlUrl">URL</label>
+      <input type="url" id="crawlUrl" class="field-input" placeholder="https://site.com" required style="margin-top:6px;">
+    </div>
+    <div>
+      <label class="field-label" for="crawlPages">Maks. sayfa</label>
+      <div class="range-row" style="margin-top:6px;">
+        <input type="range" id="crawlPages" min="5" max="100" step="5" value="30">
+        <span class="range-val" id="crawlPageVal">30</span>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn-ghost" id="crawlCancel">Vazgeç</button>
+      <button type="submit" class="btn-primary" id="crawlSubmit">Tara</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="filesDialog" aria-labelledby="filesDialogTitle" style="width:min(480px, 92vw);">
+  <div class="dialog-body">
+    <h3 id="filesDialogTitle">Yüklü Dosyalar</h3>
+    <p class="field-label" style="font-weight:400;">Bir belge ya bu sohbete özeldir (sadece burada aranır) ya da global'dir (tüm sohbetler arar).</p>
+
+    <input type="file" id="filesDialogInput" multiple hidden accept=".pdf,.xlsx,.xls,.txt">
+    <div class="files-upload-row">
+      <button type="button" class="btn-ghost" id="filesUploadOzelBtn">Bu sohbete özel yükle</button>
+      <button type="button" class="btn-ghost" id="filesUploadGlobalBtn">Global yükle</button>
+    </div>
+
+    <div class="files-group">
+      <div class="files-group-title">Global (tüm sohbetler)</div>
+      <div id="filesGlobalList" class="doc-list"></div>
+    </div>
+    <div class="files-group">
+      <div class="files-group-title">Sohbete özel</div>
+      <div id="filesOzelList" class="doc-list"></div>
+    </div>
+
+    <div class="dialog-actions">
+      <button type="button" class="btn-primary" id="filesDialogClose">Kapat</button>
+    </div>
+  </div>
+</dialog>
+
 <script>
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── State ──────────────────────────────────────────────────────────────
+const LS_MODEL = 'aa_model';
+const LS_SIDEBAR_DARALTILMIS = 'aa_sidebar_daraltilmis';
+
 let activeConvId = null;
-let selectedModel = 'chatgpt';
+let selectedModel = localStorage.getItem(LS_MODEL) || 'chatgpt';
 let isLoading = false;
 let compareMode = false;
 
-function toggleCompareMode() {
-  compareMode = !compareMode;
-  const toggle = document.getElementById('compareToggle');
-  const tag = document.getElementById('compareTag');
-  
-  if (compareMode) {
-    toggle.classList.add('selected');
-    tag.textContent = 'Açık';
-    tag.className = 'model-tag tag-gpt';
-  } else {
-    toggle.classList.remove('selected');
-    tag.textContent = 'Kapalı';
-    tag.className = 'model-tag tag-gray';
-  }
+const TOOL_LABELS = {
+  DB_QUERY: { active: 'Veritabanı sorgulanıyor', done: 'Veritabanı sorgulandı', short: 'Veritabanı' },
+  RAG:      { active: 'Belgeler taranıyor',       done: 'Belgeler tarandı',       short: 'Belgeler' },
+  SEARCH:   { active: 'İnternette aranıyor',      done: 'İnternette arandı',      short: 'İnternet' },
+  META:     { active: 'Sistem bilgisi kontrol ediliyor', done: 'Sistem bilgisi kontrol edildi', short: 'Sistem' },
+  GENERAL:  { active: 'Yanıt hazırlanıyor',       done: 'Yanıt hazırlandı',       short: 'Sohbet' },
+};
+
+const BOT_AVATAR = '<svg><use href="#i-mark"></use></svg>';
+
+// ─── Utils ──────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// Kucuk, bagimsiz bir markdown-lite render'i: kalin/kod/link satir-ici
+// bicimleri, sirali/sirasiz listeler ve basit "| a | b |" tablolari. Harici
+// kutuphane yok (proje build-tool'suz kalmali), sadece LLM cevaplarinda
+// sikca cikan bicimleri kapsar.
+function satirIcerigiIsle(s) {
+  return s
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+function tabloOlustur(satirlar) {
+  const hucrele = s => s.replace(/^\||\|$/g, '').split('|').map(h => h.trim());
+  let veriSatirlari = satirlar;
+  let baslik = null;
+  if (satirlar.length > 1 && /^[\s|:-]+$/.test(satirlar[1])) {
+    baslik = hucrele(satirlar[0]);
+    veriSatirlari = satirlar.slice(2);
+  }
+  let html = '<table class="msg-table">';
+  if (baslik) html += '<thead><tr>' + baslik.map(h => `<th>${satirIcerigiIsle(h)}</th>`).join('') + '</tr></thead>';
+  html += '<tbody>' + veriSatirlari.map(r =>
+    '<tr>' + hucrele(r).map(c => `<td>${satirIcerigiIsle(c)}</td>`).join('') + '</tr>'
+  ).join('') + '</tbody></table>';
+  return html;
+}
+
+function formatText(text) {
+  if (!text) return '';
+  const satirlar = escapeHtml(text).split('\n');
+  const bloklar = [];
+  let liste = null, listeOgeleri = [], tablo = [], paragraf = [];
+
+  const paragrafiKapat = () => { if (paragraf.length) { bloklar.push(paragraf.join('<br>')); paragraf = []; } };
+  const listeyiKapat = () => { if (liste) { bloklar.push(`<${liste}>${listeOgeleri.join('')}</${liste}>`); liste = null; listeOgeleri = []; } };
+  const tabloyuKapat = () => { if (tablo.length) { bloklar.push(tabloOlustur(tablo)); tablo = []; } };
+
+  for (const ham of satirlar) {
+    const satir = ham.trimEnd();
+    const t = satir.trim();
+
+    if (/^\|.*\|$/.test(t)) {
+      paragrafiKapat(); listeyiKapat();
+      tablo.push(t);
+      continue;
+    }
+    tabloyuKapat();
+
+    const ul = t.match(/^[-•]\s+(.+)$/);
+    const ol = t.match(/^\d+\.\s+(.+)$/);
+
+    if (ul) {
+      paragrafiKapat();
+      if (liste !== 'ul') { listeyiKapat(); liste = 'ul'; }
+      listeOgeleri.push(`<li>${satirIcerigiIsle(ul[1])}</li>`);
+    } else if (ol) {
+      paragrafiKapat();
+      if (liste !== 'ol') { listeyiKapat(); liste = 'ol'; }
+      listeOgeleri.push(`<li>${satirIcerigiIsle(ol[1])}</li>`);
+    } else {
+      listeyiKapat();
+      if (t === '') paragrafiKapat();
+      else paragraf.push(satirIcerigiIsle(satir));
+    }
+  }
+  paragrafiKapat(); listeyiKapat(); tabloyuKapat();
+
+  return bloklar.join('<br>');
+}
+function nowTime() {
+  return new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+function scrollToBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+function sourceTagClass(s) {
+  const v = s.toLowerCase();
+  if (v.includes('verita')) return 'tag-db';
+  if (v.includes('belge')) return 'tag-rag';
+  if (v.includes('internet') || v.includes('web')) return 'tag-web';
+  if (v.includes('güvenlik') || v.includes('guvenlik') || v.includes('hata') || v.includes('sistem')) return 'tag-sys';
+  return 'tag-chat';
+}
+
+// ─── Toasts ─────────────────────────────────────────────────────────────
+function toast(msg, type = 'inf', opts = {}) {
+  const area = document.getElementById('toastArea');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${escapeHtml(msg)}</span>`;
+  if (opts.actionLabel) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = opts.actionLabel;
+    btn.addEventListener('click', () => { opts.onAction?.(); el.remove(); });
+    el.appendChild(btn);
+  }
+  area.appendChild(el);
+  setTimeout(() => el.remove(), opts.duration || 4000);
+  return el;
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────
+async function girisDurumunuKontrolEtVeBaslat() {
+  try {
+    const res = await fetch('/api/me');
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('sidebarEmail').textContent = data.email || '';
+      await init();
+      return;
+    }
+  } catch (e) {
+    // sunucuya ulasilamadi, giris ekranini yine de goster
+  }
+  document.getElementById('loader').classList.add('hidden');
+  document.getElementById('loginScreen').hidden = false;
+  document.getElementById('loginEmail').focus();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const sifre = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+  errEl.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Giriş yapılıyor…';
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, sifre })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('sidebarEmail').textContent = data.email || '';
+      document.getElementById('loginScreen').hidden = true;
+      document.getElementById('loader').classList.remove('hidden');
+      document.getElementById('loaderMsg').textContent = 'Sistem başlatılıyor…';
+      await init();
+    } else {
+      errEl.textContent = data.error || 'Giriş başarısız.';
+      errEl.classList.add('visible');
+    }
+  } catch (e) {
+    errEl.textContent = 'Sunucu hatası: ' + e.message;
+    errEl.classList.add('visible');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Giriş yap';
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.reload();
+});
+
+// ─── Init ───────────────────────────────────────────────────────────────
 async function init() {
   const loaderMsg = document.getElementById('loaderMsg');
-  loaderMsg.textContent = 'Embedding modeli ve LLM yükleniyor...';
-
+  loaderMsg.textContent = 'Embedding modeli ve LLM yükleniyor…';
   try {
     const res = await fetch('/api/init', { method: 'POST' });
     const data = await res.json();
-
     if (data.ok) {
-      loaderMsg.textContent = 'Hazır! ✨';
-      setTimeout(() => {
-        document.getElementById('loader').classList.add('hidden');
-        setStatus(true);
-      }, 600);
+      loaderMsg.textContent = 'Hazır!';
+      setTimeout(() => { document.getElementById('loader').classList.add('hidden'); setStatus(true); }, 400);
       await loadConversations(true);
       await loadDocuments();
     } else {
-      loaderMsg.textContent = '❌ Hata: ' + data.error;
+      loaderMsg.textContent = 'Hata: ' + data.error;
     }
   } catch (e) {
-    loaderMsg.textContent = '❌ Sunucuya bağlanılamadı. Uygulama çalışıyor mu?';
+    loaderMsg.textContent = 'Sunucuya bağlanılamadı. Uygulama çalışıyor mu?';
   }
 }
-
 function setStatus(online) {
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  dot.className = 'status-dot' + (online ? ' online' : '');
-  txt.textContent = online ? 'Çevrimiçi' : 'Çevrimdışı';
+  document.getElementById('statusDot').classList.toggle('online', online);
+  document.getElementById('statusText').textContent = online ? 'Çevrimiçi' : 'Çevrimdışı';
 }
 
-// ─── Conversations ─────────────────────────────────────────────────────────────
+// ─── Sidebar toggle (responsive) ───────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+if (localStorage.getItem(LS_SIDEBAR_DARALTILMIS) === '1') {
+  sidebar.classList.add('collapsed');
+  document.getElementById('expandSidebarBtn').style.display = 'grid';
+}
+
+function openSidebarMobile() { sidebar.classList.add('mobile-open'); sidebarBackdrop.classList.add('active'); }
+function closeSidebarMobile() { sidebar.classList.remove('mobile-open'); sidebarBackdrop.classList.remove('active'); }
+document.getElementById('sidebarToggleMobile').addEventListener('click', openSidebarMobile);
+sidebarBackdrop.addEventListener('click', closeSidebarMobile);
+document.getElementById('collapseSidebarBtn').addEventListener('click', () => {
+  sidebar.classList.add('collapsed');
+  document.getElementById('expandSidebarBtn').style.display = 'grid';
+  localStorage.setItem(LS_SIDEBAR_DARALTILMIS, '1');
+});
+document.getElementById('expandSidebarBtn').addEventListener('click', () => {
+  sidebar.classList.remove('collapsed');
+  document.getElementById('expandSidebarBtn').style.display = 'none';
+  localStorage.removeItem(LS_SIDEBAR_DARALTILMIS);
+});
+
+// ─── Conversations ──────────────────────────────────────────────────────
 async function loadConversations(shouldSwitch = false) {
   const res = await fetch('/api/conversations');
   const data = await res.json();
   activeConvId = data.active;
   renderConvList(data.conversations);
-  if (shouldSwitch && activeConvId) {
-    await switchConv(activeConvId);
-  }
+  if (shouldSwitch && activeConvId) await switchConv(activeConvId);
 }
 
+let sonConvListesi = [];
+const bekleyenSilmeler = new Set(); // "silindi" gibi gosterilen ama suresi dolana kadar gercekten DELETE edilmemis id'ler
+const silmeZamanlayicilari = {};
+
 function renderConvList(convs) {
+  sonConvListesi = convs;
   const list = document.getElementById('convList');
   list.innerHTML = '';
-  convs.forEach(c => {
+  convs.filter(c => !bekleyenSilmeler.has(c.id)).forEach(c => {
     const div = document.createElement('div');
     div.className = 'conv-item' + (c.id === activeConvId ? ' active' : '');
     div.dataset.id = c.id;
     div.innerHTML = `
-      <span style="font-size:14px;">💬</span>
-      <span class="conv-name">${c.name}</span>
-      <button class="conv-del" onclick="deleteConv('${c.id}',event)" title="Sil">✕</button>
+      <span class="conv-name">${escapeHtml(c.name)}</span>
+      <button class="conv-del" aria-label="Sohbeti sil" title="Sil"><svg class="i"><use href="#i-trash"></use></svg></button>
     `;
-    div.addEventListener('click', () => switchConv(c.id));
+    div.addEventListener('click', () => { switchConv(c.id); closeSidebarMobile(); });
+    div.querySelector('.conv-del').addEventListener('click', (e) => { e.stopPropagation(); deleteConv(c.id); });
     list.appendChild(div);
   });
 }
@@ -911,73 +1271,202 @@ async function newConv() {
   const data = await res.json();
   activeConvId = data.id;
   await loadConversations(true);
-  toast('Yeni sohbet başlatıldı.', 'ok');
+  closeSidebarMobile();
 }
 
 async function switchConv(id) {
   const res = await fetch(`/api/conversations/${id}/switch`, { method: 'POST' });
   const data = await res.json();
   activeConvId = id;
-
-  // Update sidebar active state
-  document.querySelectorAll('.conv-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.id === id);
-  });
-
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
   renderHistory(data.history);
   updateStats(data.tokens, data.cost);
-
-  const conv = Array.from(document.querySelectorAll('.conv-item'))
-    .find(el => el.dataset.id === id);
-  const name = conv?.querySelector('.conv-name')?.textContent || 'Sohbet';
-  updateChatTitle(name, data.history.length);
+  const el = document.querySelector(`.conv-item[data-id="${id}"] .conv-name`);
+  document.getElementById('chatTitle').textContent = el ? el.textContent : 'Sohbet';
+  await loadDocuments(); // her sohbetin erisebildigi belgeler farkli olabilir
 }
 
-async function deleteConv(id, e) {
-  e.stopPropagation();
-  await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
-  await loadConversations(true);
-  toast('Sohbet silindi.', 'inf');
+function deleteConv(id) {
+  const isim = sonConvListesi.find(c => c.id === id)?.name || 'Sohbet';
+  const wasActive = id === activeConvId;
+  const SURE = 5000;
+
+  bekleyenSilmeler.add(id);
+  renderConvList(sonConvListesi);
+
+  toast(`"${isim}" silindi.`, 'inf', {
+    duration: SURE,
+    actionLabel: 'Geri al',
+    onAction: () => {
+      clearTimeout(silmeZamanlayicilari[id]);
+      delete silmeZamanlayicilari[id];
+      bekleyenSilmeler.delete(id);
+      renderConvList(sonConvListesi);
+    }
+  });
+
+  silmeZamanlayicilari[id] = setTimeout(async () => {
+    delete silmeZamanlayicilari[id];
+    await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+    bekleyenSilmeler.delete(id);
+    await loadConversations(wasActive);
+  }, SURE);
 }
 
-async function resetConv() {
+let bekleyenSifirlama = null; // {convId, timer} — "Sıfırla" da geri-alinabilir, Sil ile ayni desen
+
+document.getElementById('resetBtn').addEventListener('click', () => {
   if (!activeConvId) return;
-  await fetch(`/api/conversations/${activeConvId}/reset`, { method: 'POST' });
+  if (bekleyenSifirlama) clearTimeout(bekleyenSifirlama.timer);
+
+  const convId = activeConvId;
+  const mesajlarHtml = document.getElementById('messages').innerHTML;
+  const oncekiTokens = document.getElementById('sidebarTokens').textContent;
+  const oncekiCost = document.getElementById('costPill').textContent;
+  const SURE = 5000;
+
   clearMessages();
   updateStats(0, '$0.00000');
-  toast('Sohbet sıfırlandı.', 'ok');
+
+  toast('Sohbet sıfırlanacak.', 'inf', {
+    duration: SURE,
+    actionLabel: 'Geri al',
+    onAction: () => {
+      clearTimeout(bekleyenSifirlama?.timer);
+      bekleyenSifirlama = null;
+      if (activeConvId === convId) {
+        document.getElementById('messages').innerHTML = mesajlarHtml;
+        document.getElementById('sidebarTokens').textContent = oncekiTokens;
+        document.getElementById('costPill').textContent = oncekiCost;
+      }
+    }
+  });
+
+  bekleyenSifirlama = {
+    convId,
+    timer: setTimeout(async () => {
+      bekleyenSifirlama = null;
+      await fetch(`/api/conversations/${convId}/reset`, { method: 'POST' });
+    }, SURE)
+  };
+});
+
+// ─── Chat / streaming ───────────────────────────────────────────────────
+function stepItemHtml(tool) {
+  const l = TOOL_LABELS[tool] || { active: tool, done: tool, short: tool };
+  return `
+    <li class="step-item pending" data-tool="${escapeHtml(tool)}">
+      <span class="step-icon"><svg class="i step-check"><use href="#i-check"></use></svg></span>
+      <span class="step-label" data-active="${escapeHtml(l.active)}" data-done="${escapeHtml(l.done)}">${escapeHtml(l.active)}</span>
+      <span class="step-source"></span>
+    </li>`;
 }
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+function handleStepEvent(block, olay) {
+  const list = block.querySelector('.step-list');
+  const summaryLabel = block.querySelector('.step-summary-label');
+
+  if (olay.type === 'plan') {
+    list.innerHTML = olay.adimlar.map(stepItemHtml).join('');
+    summaryLabel.textContent = 'Düşünülüyor…';
+  } else if (olay.type === 'adim_basladi') {
+    let item = list.querySelector(`.step-item[data-tool="${olay.tool}"]`);
+    if (!item) { list.insertAdjacentHTML('beforeend', stepItemHtml(olay.tool)); item = list.lastElementChild; }
+    item.classList.remove('pending'); item.classList.add('active');
+    const lbl = item.querySelector('.step-label');
+    if (olay.ek) lbl.textContent = 'Yeterli bilgi yoktu, ' + (TOOL_LABELS[olay.tool]?.short || olay.tool) + ' deneniyor…';
+    summaryLabel.textContent = lbl.textContent;
+  } else if (olay.type === 'adim_bitti') {
+    const item = list.querySelector(`.step-item[data-tool="${olay.tool}"]`);
+    if (item) {
+      item.classList.remove('active', 'pending'); item.classList.add('done');
+      const lbl = item.querySelector('.step-label');
+      lbl.textContent = lbl.dataset.done;
+      if (olay.kaynak) item.querySelector('.step-source').textContent = olay.kaynak;
+    }
+  } else if (olay.type === 'birlestiriliyor') {
+    list.insertAdjacentHTML('beforeend', `
+      <li class="step-item active" data-tool="_merge">
+        <span class="step-icon"><svg class="i step-check"><use href="#i-check"></use></svg></span>
+        <span class="step-label" data-done="Yanıtlar birleştirildi">Yanıtlar birleştiriliyor</span>
+      </li>`);
+    summaryLabel.textContent = 'Yanıtlar birleştiriliyor…';
+  }
+  scrollToBottom();
+}
+
+function finalizeStepBlock(block) {
+  const list = block.querySelector('.step-list');
+  const items = [...list.querySelectorAll('.step-item')];
+  items.forEach(el => {
+    el.classList.remove('active', 'pending'); el.classList.add('done');
+    const lbl = el.querySelector('.step-label');
+    if (lbl?.dataset.done) lbl.textContent = lbl.dataset.done;
+  });
+  const short = items.map(el => (TOOL_LABELS[el.dataset.tool]?.short)).filter(Boolean);
+  block.querySelector('.step-summary-label').textContent = 'Nasıl yanıtladım' + (short.length ? ' · ' + short.join(' + ') : '');
+  block.querySelector('.step-block').open = false;
+}
+
+function renderAnswerInto(body, data, isError = false) {
+  let bubbleHtml;
+  if (data.cevap_norag) {
+    bubbleHtml = `
+      <div class="compare-grid">
+        <div class="compare-col">
+          <div class="compare-label rag">RAG destekli</div>
+          <div class="bubble">${formatText(data.cevap)}</div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label norag">RAG'sız</div>
+          <div class="bubble">${formatText(data.cevap_norag)}</div>
+        </div>
+      </div>`;
+  } else {
+    bubbleHtml = `<div class="bubble${isError ? ' bubble-error' : ''}">${formatText(data.cevap)}</div>`;
+  }
+
+  let metaHtml = `<span class="msg-time">${nowTime()}</span>`;
+  if (data.kaynak && !isError) {
+    data.kaynak.split('+').forEach(s => { metaHtml += `<span class="tag ${sourceTagClass(s)}">${escapeHtml(s)}</span>`; });
+  }
+  const t = data.msg_tokens ?? data.tokens;
+  const c = data.msg_cost ?? data.cost;
+  if (t) metaHtml += `<span class="tag tag-mono">${t} token${c ? ' · ' + c : ''}</span>`;
+
+  body.insertAdjacentHTML('beforeend', `${bubbleHtml}<div class="msg-meta">${metaHtml}</div>`);
+  scrollToBottom();
+}
+
 async function sendMessage() {
   const input = document.getElementById('msgInput');
   const text = input.value.trim();
   if (!text || isLoading) return;
 
-  input.value = '';
-  input.style.height = 'auto';
+  input.value = ''; input.style.height = 'auto';
   isLoading = true;
   document.getElementById('sendBtn').disabled = true;
-
   hideWelcome();
-  appendMessage('user', text);
-  const typingEl = appendTyping();
+  appendUserMessage(text);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  wrap.innerHTML = `<div class="msg-avatar">${BOT_AVATAR}</div><div class="msg-body"></div>`;
+  document.getElementById('messages').appendChild(wrap);
+  const body = wrap.querySelector('.msg-body');
+  scrollToBottom();
+
+  let stepBlockEl = null;
 
   try {
     const res = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: text,
-        conv_id: activeConvId,
-        model: selectedModel,
-        karsilastir: compareMode
-      })
+      body: JSON.stringify({ message: text, conv_id: activeConvId, model: selectedModel, karsilastir: compareMode })
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
-    let finalData = null;
+    let buffer = '', finalData = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -991,23 +1480,36 @@ async function sendMessage() {
         if (olay.type === 'final') {
           finalData = olay;
         } else {
-          const metin = olayMetni(olay);
-          if (metin) updateTypingStatus(typingEl, metin);
+          if (!stepBlockEl) {
+            body.insertAdjacentHTML('afterbegin', `
+              <details class="step-block" open>
+                <summary class="step-summary"><svg class="i step-chevron"><use href="#i-chevron-right"></use></svg><span class="step-summary-label">Düşünülüyor…</span></summary>
+                <ol class="step-list"></ol>
+              </details>`);
+            stepBlockEl = body;
+          }
+          handleStepEvent(body, olay);
         }
       }
     }
 
-    typingEl.remove();
+    if (stepBlockEl) finalizeStepBlock(body);
 
     if (!finalData || finalData.error) {
-      appendMessage('bot', '❌ ' + (finalData ? finalData.error : 'Bilinmeyen hata'), 'Hata', null);
+      renderAnswerInto(body, { cevap: finalData ? finalData.error : 'Bilinmeyen hata' }, true);
     } else {
-      appendMessage('bot', finalData.cevap, finalData.kaynak, finalData.niyet, finalData.msg_tokens, finalData.msg_cost, finalData.cevap_norag);
+      renderAnswerInto(body, finalData);
       updateStats(finalData.tokens, finalData.cost);
+      if (finalData.sohbet_ismi) {
+        document.getElementById('chatTitle').textContent = finalData.sohbet_ismi;
+        const convItem = document.querySelector(`.conv-item[data-id="${activeConvId}"] .conv-name`);
+        if (convItem) convItem.textContent = finalData.sohbet_ismi;
+        const kayit = sonConvListesi.find(c => c.id === activeConvId);
+        if (kayit) kayit.name = finalData.sohbet_ismi;
+      }
     }
   } catch (e) {
-    typingEl.remove();
-    appendMessage('bot', '❌ Sunucu hatası: ' + e.message, 'Hata', null);
+    renderAnswerInto(body, { cevap: 'Sunucu hatası: ' + e.message }, true);
   }
 
   isLoading = false;
@@ -1015,345 +1517,340 @@ async function sendMessage() {
   input.focus();
 }
 
-function sendChip(text) {
-  document.getElementById('msgInput').value = text;
-  sendMessage();
-}
-
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-}
-
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
-}
-
-// ─── Message rendering ────────────────────────────────────────────────────────
-function appendMessage(role, text, source, intent, tokens, cost, cevap_norag) {
+function appendUserMessage(text) {
   const msgs = document.getElementById('messages');
   const div = document.createElement('div');
-  div.className = 'msg ' + role;
-
-  const avatar = role === 'user' ? '👤' : '🎓';
-  const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-
-  let srcHtml = '';
-  if (source && role === 'bot') {
-    source.split('+').forEach(s => {
-      srcHtml += `<span class="msg-source ${srcMap(s)}">📌 ${s}</span>`;
-    });
-  }
-  if (intent && role === 'bot') {
-    intent.split('+').forEach(i => {
-      srcHtml += `<span class="intent-badge intent-${i}">${intentLabel(i)}</span>`;
-    });
-  }
-  if (tokens !== undefined && tokens !== null && role === 'bot') {
-    let costStr = '';
-    if (cost !== undefined && cost !== null) {
-      if (typeof cost === 'number') {
-        costStr = ` ($${cost.toFixed(5)})`;
-      } else {
-        costStr = ` (${cost})`;
-      }
-    }
-    srcHtml += `<span class="msg-source src-tokens">🪙 ${tokens} token${costStr}</span>`;
-  }
-
-  let bubbleHtml = '';
-  if (cevap_norag && role === 'bot') {
-    const formattedTextRag = formatText(text);
-    const formattedTextNoRag = formatText(cevap_norag);
-    bubbleHtml = `
-      <div class="compare-container">
-        <div class="compare-box rag-box">
-          <div class="compare-header">📚 RAG Destekli Yanıt (Veritabanı / Belge / Web)</div>
-          <div class="msg-bubble">${formattedTextRag}</div>
-        </div>
-        <div class="compare-box norag-box">
-          <div class="compare-header">⚠️ Normal LLM Yanıtı (RAG'sız)</div>
-          <div class="msg-bubble">${formattedTextNoRag}</div>
-        </div>
-      </div>
-    `;
-  } else {
-    const formattedText = formatText(text);
-    bubbleHtml = `<div class="msg-bubble">${formattedText}</div>`;
-  }
-
-  div.innerHTML = `
-    <div class="msg-avatar">${avatar}</div>
-    <div class="msg-body">
-      ${bubbleHtml}
-      <div class="msg-meta">
-        <span class="msg-time">${time}</span>
-        ${srcHtml}
-      </div>
-    </div>
-  `;
+  div.className = 'msg user';
+  div.innerHTML = `<div class="msg-body"><div class="bubble bubble-user">${formatText(text)}</div><div class="msg-meta"><span class="msg-time">${nowTime()}</span></div></div>`;
   msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-  return div;
+  scrollToBottom();
 }
 
-function appendTyping() {
+function appendSystemNote(text, tone = 'pending') {
   const msgs = document.getElementById('messages');
   const div = document.createElement('div');
-  div.className = 'msg bot';
-  div.innerHTML = `
-    <div class="msg-avatar">🎓</div>
-    <div class="msg-body">
-      <div class="typing-bubble">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-      </div>
-      <div class="typing-status"></div>
-    </div>
-  `;
+  div.className = 'msg system';
+  const icon = tone === 'done' ? 'i-check' : tone === 'error' ? 'i-alert' : 'i-loader';
+  div.innerHTML = `<div class="system-note ${tone}"><svg class="i"><use href="#${icon}"></use></svg><span>${escapeHtml(text)}</span></div>`;
   msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
+  scrollToBottom();
   return div;
 }
-
-function updateTypingStatus(typingEl, text) {
-  const statusEl = typingEl.querySelector('.typing-status');
-  if (statusEl) statusEl.textContent = text;
-  const msgs = document.getElementById('messages');
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function olayMetni(olay) {
-  const isimler = { DB_QUERY: 'Veritabanı', RAG: 'Belgeler', SEARCH: 'İnternet', META: 'Sistem', GENERAL: 'Sohbet' };
-  if (olay.type === 'plan' && olay.adimlar.length > 1) {
-    return `Plan: ${olay.adimlar.map(t => isimler[t] || t).join(' + ')}`;
-  }
-  if (olay.type === 'adim_basladi') {
-    const etiket = isimler[olay.tool] || olay.tool;
-    return olay.ek ? `Yeterli bilgi bulunamadı, ${etiket} deneniyor...` : `${olay.index}/${olay.toplam}: ${etiket} sorgulanıyor...`;
-  }
-  if (olay.type === 'birlestiriliyor') {
-    return 'Sonuçlar birleştiriliyor...';
-  }
-  return '';
+function updateSystemNote(el, text, tone) {
+  const note = el.querySelector('.system-note');
+  note.className = 'system-note ' + tone;
+  const icon = tone === 'done' ? 'i-check' : tone === 'error' ? 'i-alert' : 'i-loader';
+  note.querySelector('use').setAttribute('href', '#' + icon);
+  note.querySelector('span').textContent = text;
 }
 
 function renderHistory(history) {
   clearMessages();
-  if (!history || history.length === 0) return;
+  if (!history || !history.length) return;
   history.forEach(h => {
-    appendMessage('user', h.user);
-    appendMessage('bot', h.cevap, h.kaynak, h.niyet || null, h.tokens || null, h.cost || null, h.cevap_norag || null);
+    appendUserMessage(h.user);
+    const wrap = document.createElement('div');
+    wrap.className = 'msg bot';
+    wrap.innerHTML = `<div class="msg-avatar">${BOT_AVATAR}</div><div class="msg-body"></div>`;
+    document.getElementById('messages').appendChild(wrap);
+    renderAnswerInto(wrap.querySelector('.msg-body'), {
+      cevap: h.cevap, cevap_norag: h.cevap_norag, kaynak: h.kaynak,
+      msg_tokens: h.tokens, msg_cost: h.cost
+    }, h.niyet === 'GUARDRAIL');
   });
 }
 
 function clearMessages() {
-  const msgs = document.getElementById('messages');
-  msgs.innerHTML = `
-    <div class="welcome" id="welcomeScreen">
-      <div class="welcome-icon">🎓</div>
-      <h2>Akademik Chatbot'a Hoşgeldiniz</h2>
-      <p>Öğrenci/ders sorguları, belge analizi,<br>internet araması ve genel sorularınız için buradayım.</p>
-      <div class="welcome-chips">
-        <div class="chip" onclick="sendChip('Okulda kaç öğrenci var?')">📊 Öğrenci sayısı</div>
-        <div class="chip" onclick="sendChip('Hangi bölümler var?')">🏫 Bölümler</div>
-        <div class="chip" onclick="sendChip('Yapay Zeka dersini kim veriyor?')">👨‍🏫 Ders sorgusu</div>
-        <div class="chip" onclick="sendChip('Yüklü belgeler neler?')">📄 Belgeler</div>
-        <div class="chip" onclick="sendChip('Yapay zeka nedir?')">🌐 İnternet araması</div>
-      </div>
-    </div>
-  `;
+  document.getElementById('messages').innerHTML = document.getElementById('welcomeTemplate').innerHTML;
 }
-
 function hideWelcome() {
   const w = document.getElementById('welcomeScreen');
   if (w) w.remove();
 }
 
-function formatText(text) {
-  if (!text) return '';
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^•\s/gm, '• ')
-    .replace(/\n/g, '<br>');
-}
+// Delegated (not bound per-chip): the welcome screen is re-inserted from
+// #welcomeTemplate after every reset, so a one-time querySelectorAll bind
+// would go stale on the next reset.
+document.getElementById('messages').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  document.getElementById('msgInput').value = chip.dataset.chip;
+  sendMessage();
+});
 
-function srcMap(src) {
-  if (!src) return 'src-chat';
-  src = src.toLowerCase();
-  if (src.includes('verita')) return 'src-db';
-  if (src.includes('belge') || src.includes('rag') || src.includes('kaynak')) return 'src-rag';
-  if (src.includes('internet') || src.includes('web')) return 'src-web';
-  if (src.includes('güvenlik') || src.includes('guvenlik')) return 'src-sys';
-  if (src.includes('sistem') || src.includes('hata')) return 'src-sys';
-  return 'src-chat';
-}
+const msgInput = document.getElementById('msgInput');
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+msgInput.addEventListener('input', () => {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 160) + 'px';
+});
+document.getElementById('sendBtn').addEventListener('click', sendMessage);
+document.getElementById('newConvBtn').addEventListener('click', newConv);
 
-function intentLabel(intent) {
-  const map = { DB_QUERY: 'VT', SEARCH: 'WEB', META: 'META', GENERAL: 'SOHBET', RAG: 'RAG', GUARDRAIL: 'GÜVENLİK' };
-  return map[intent] || intent;
-}
-
-// ─── UI helpers ───────────────────────────────────────────────────────────────
+// ─── Stats / model / compare ───────────────────────────────────────────
 function updateStats(tokens, cost) {
   document.getElementById('sidebarTokens').textContent = tokens.toLocaleString();
-  document.getElementById('sidebarCost').textContent = cost;
-  document.getElementById('topbarTokens').textContent = tokens.toLocaleString() + ' token';
+  document.getElementById('costPill').textContent = cost;
 }
-
-function updateChatTitle(name, msgCount) {
-  document.getElementById('chatTitle').textContent = name;
-  document.getElementById('chatMeta').textContent = msgCount + ' mesaj';
-}
+const MODEL_BILGISI = {
+  chatgpt: { etiket: 'ChatGPT', tag: 'gpt-4o-mini' },
+  gemini: { etiket: 'Gemini', tag: 'flash' },
+};
 
 function selectModel(model) {
   selectedModel = model;
-  document.getElementById('radioGpt').classList.toggle('selected', model === 'chatgpt');
-  document.getElementById('radioGem').classList.toggle('selected', model === 'gemini');
+  const bilgi = MODEL_BILGISI[model];
+  document.getElementById('modelSelectLabel').textContent = bilgi.etiket;
+  document.getElementById('modelSelectTag').textContent = bilgi.tag;
+  document.getElementById('modelOptGpt').classList.toggle('selected', model === 'chatgpt');
+  document.getElementById('modelOptGem').classList.toggle('selected', model === 'gemini');
+  localStorage.setItem(LS_MODEL, model);
 }
+document.getElementById('modelOptGpt').addEventListener('click', () => { selectModel('chatgpt'); document.getElementById('modelMenu').hidePopover(); });
+document.getElementById('modelOptGem').addEventListener('click', () => { selectModel('gemini'); document.getElementById('modelMenu').hidePopover(); });
+document.getElementById('modelMenu').addEventListener('toggle', e => {
+  if (e.newState === 'open') popoveriTetikleyiciyeGoreKonumlandir(e.target, document.getElementById('modelSelectBtn'));
+});
+selectModel(selectedModel); // localStorage'dan geri yuklenen (veya varsayilan) modeli UI'a yansit
+document.getElementById('compareToggle').addEventListener('change', e => { compareMode = e.target.checked; });
 
-// ─── Documents ────────────────────────────────────────────────────────────────
+// ─── Documents ──────────────────────────────────────────────────────────
 async function loadDocuments() {
-  const res = await fetch('/api/documents');
+  const res = await fetch(`/api/documents?conv_id=${encodeURIComponent(activeConvId || '')}`);
   const data = await res.json();
   renderDocList(data.documents);
 }
 
 function renderDocList(docs) {
   const list = document.getElementById('docList');
-  if (!docs || docs.length === 0) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Henüz belge yüklenmedi.</div>';
-    return;
-  }
+  const pill = document.getElementById('docsPill');
+  document.getElementById('docsCount').textContent = docs.length;
+  pill.dataset.visible = docs.length > 0 ? 'true' : 'false';
+  if (!docs.length) { list.innerHTML = '<p class="docs-empty">Henüz belge yüklenmedi.</p>'; return; }
   list.innerHTML = docs.map(d => `
-    <div class="doc-item">
-      <span class="doc-icon">${d.endsWith('.pdf') ? '📄' : '📊'}</span>
-      <span class="doc-name" title="${d}">${d}</span>
-      <button class="doc-del" onclick="deleteDoc('${d}')" title="Sil">✕</button>
-    </div>
-  `).join('');
+    <div class="doc-row">
+      <svg><use href="#i-file"></use></svg>
+      <span class="doc-row-name" title="${escapeHtml(d)}">${escapeHtml(d)}</span>
+      <button class="icon-btn icon-btn-sm" data-doc="${escapeHtml(d)}" aria-label="Belgeyi sil"><svg class="i"><use href="#i-trash"></use></svg></button>
+    </div>`).join('');
+  list.querySelectorAll('button[data-doc]').forEach(btn => btn.addEventListener('click', () => deleteDoc(btn.dataset.doc)));
 }
 
-let pendingFiles = null;
-
-function filesSelected() {
-  const input = document.getElementById('fileInput');
-  pendingFiles = input.files;
-  const btn = document.getElementById('uploadBtn');
-  const info = document.getElementById('selectedFiles');
-
-  if (pendingFiles.length > 0) {
-    info.textContent = `${pendingFiles.length} dosya seçildi: ` +
-      Array.from(pendingFiles).map(f => f.name).join(', ');
-    btn.disabled = false;
-  } else {
-    info.textContent = '';
-    btn.disabled = true;
+// Native popover API kendi basina konumlandirma yapmiyor (varsayilan sol-ust
+// koseye dusuyor); tetikleyici butonun hemen ustune (composer asagida oldugu
+// icin yukari acilmasi gerekiyor) JS ile hizaliyoruz. CSS Anchor Positioning
+// Firefox/Safari'de henuz yok, bu yuzden getBoundingClientRect tabanli,
+// her tarayicida calisan bu yaklasimi kullaniyoruz.
+function popoveriTetikleyiciyeGoreKonumlandir(popoverEl, tetikleyiciEl) {
+  const buton = tetikleyiciEl.getBoundingClientRect();
+  const genislik = popoverEl.offsetWidth || 200;
+  const bosluk = 6;
+  let left = buton.left;
+  if (left + genislik > window.innerWidth - 8) {
+    left = Math.max(8, buton.right - genislik);
   }
+  popoverEl.style.position = 'fixed';
+  popoverEl.style.left = `${Math.round(left)}px`;
+  popoverEl.style.top = 'auto';
+  popoverEl.style.right = 'auto';
+  popoverEl.style.bottom = `${Math.round(window.innerHeight - buton.top + bosluk)}px`;
 }
 
-async function uploadFiles() {
-  if (!pendingFiles || pendingFiles.length === 0) return;
-  const btn = document.getElementById('uploadBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Yükleniyor...';
+document.getElementById('attachMenu').addEventListener('toggle', e => {
+  if (e.newState === 'open') popoveriTetikleyiciyeGoreKonumlandir(e.target, document.getElementById('attachBtn'));
+});
+document.getElementById('docsMenu').addEventListener('toggle', e => {
+  if (e.newState === 'open') popoveriTetikleyiciyeGoreKonumlandir(e.target, document.getElementById('docsPill'));
+});
 
+document.getElementById('attachFileOpt').addEventListener('click', () => {
+  document.getElementById('attachMenu').hidePopover();
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', async e => {
+  if (e.target.files.length) await uploadFiles(e.target.files);
+  e.target.value = '';
+});
+
+async function uploadFiles(files, kapsam = 'ozel') {
+  hideWelcome();
+  const names = Array.from(files).map(f => f.name);
+  const note = appendSystemNote(`${names.join(', ')} yükleniyor…`, 'pending');
   const form = new FormData();
-  Array.from(pendingFiles).forEach(f => form.append('files', f));
-
+  Array.from(files).forEach(f => form.append('files', f));
+  form.append('kapsam', kapsam);
+  form.append('conv_id', activeConvId || ''); // 'ozel' icin sahiplik, her iki kapsamda da dogru scoped liste donmesi icin
   try {
     const res = await fetch('/api/documents/upload', { method: 'POST', body: form });
     const data = await res.json();
     renderDocList(data.documents);
-    toast(`✅ ${data.uploaded.length} belge yüklendi!`, 'ok');
-    if (data.errors.length) toast('Hatalar: ' + data.errors.join(', '), 'err');
-    document.getElementById('fileInput').value = '';
-    document.getElementById('selectedFiles').textContent = '';
-    pendingFiles = null;
+    if (data.uploaded.length) {
+      const etiket = kapsam === 'global' ? ' (global)' : '';
+      updateSystemNote(note, `${data.uploaded.join(', ')} belgelere eklendi${etiket}`, 'done');
+    } else {
+      updateSystemNote(note, 'Hiçbir belge eklenemedi', 'error');
+    }
+    if (data.errors && data.errors.length) toast('Hatalar: ' + data.errors.join(', '), 'err');
+    return data;
   } catch (e) {
-    toast('Yükleme hatası: ' + e.message, 'err');
+    updateSystemNote(note, 'Yükleme hatası: ' + e.message, 'error');
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Sisteme Yükle';
 }
 
 async function deleteDoc(name) {
-  const res = await fetch(`/api/documents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  const res = await fetch(`/api/documents/${encodeURIComponent(name)}?conv_id=${encodeURIComponent(activeConvId || '')}`, { method: 'DELETE' });
   const data = await res.json();
   renderDocList(data.documents);
-  toast(`🗑️ ${name} silindi.`, 'inf');
+  toast(`"${name}" silindi.`, 'inf');
 }
 
-// ─── Crawler ──────────────────────────────────────────────────────────────────
-async function crawlSite() {
+// ─── Web crawl ──────────────────────────────────────────────────────────
+const crawlDialog = document.getElementById('crawlDialog');
+document.getElementById('attachUrlOpt').addEventListener('click', () => {
+  document.getElementById('attachMenu').hidePopover();
+  crawlDialog.showModal();
+  document.getElementById('crawlUrl').focus();
+});
+document.getElementById('crawlCancel').addEventListener('click', () => crawlDialog.close());
+document.getElementById('crawlPages').addEventListener('input', e => {
+  document.getElementById('crawlPageVal').textContent = e.target.value;
+});
+
+document.getElementById('crawlForm').addEventListener('submit', async e => {
+  e.preventDefault();
   const url = document.getElementById('crawlUrl').value.trim();
   const maxPages = document.getElementById('crawlPages').value;
+  if (!url || !url.startsWith('http')) { toast('Geçerli bir URL girin (http:// ile başlamalı)', 'err'); return; }
 
-  if (!url || !url.startsWith('http')) {
-    toast('Geçerli bir URL girin (http:// ile başlamalı)', 'err');
-    return;
-  }
-
-  const btn = document.querySelector('.btn-crawl');
-  btn.disabled = true;
-  btn.textContent = '⏳ Taranıyor...';
-  toast('Tarama başladı, bu işlem birkaç dakika sürebilir...', 'inf');
+  crawlDialog.close();
+  hideWelcome();
+  const note = appendSystemNote(`${url} taranıyor…`, 'pending');
 
   try {
     const res = await fetch('/api/crawl', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, max_pages: parseInt(maxPages) })
+      body: JSON.stringify({ url, max_pages: parseInt(maxPages), conv_id: activeConvId })
     });
     const data = await res.json();
-
     if (data.ok) {
       renderDocList(data.documents);
-      toast(`✅ ${data.crawled} sayfa tarandı: ${data.doc_name}`, 'ok');
+      updateSystemNote(note, `${data.crawled} sayfa tarandı · ${data.doc_name}`, 'done');
       document.getElementById('crawlUrl').value = '';
     } else {
-      toast('Hata: ' + data.error, 'err');
+      updateSystemNote(note, 'Tarama hatası: ' + data.error, 'error');
     }
   } catch (e) {
-    toast('Bağlantı hatası: ' + e.message, 'err');
-  }
-
-  btn.disabled = false;
-  btn.textContent = '🕷️ Siteyi Tara';
-}
-
-// ─── Drag & drop ──────────────────────────────────────────────────────────────
-const dropzone = document.getElementById('dropzone');
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
-dropzone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropzone.classList.remove('drag-over');
-  const files = e.dataTransfer.files;
-  if (files.length) {
-    document.getElementById('fileInput').files = files;
-    filesSelected();
+    updateSystemNote(note, 'Bağlantı hatası: ' + e.message, 'error');
   }
 });
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function toast(msg, type = 'inf') {
-  const area = document.getElementById('toastArea');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  area.appendChild(el);
-  setTimeout(() => el.remove(), 4000);
+// ─── Dosya yönetimi (Özel / Global) ────────────────────────────────────
+function renderFilesDialog(docs) {
+  const globalList = document.getElementById('filesGlobalList');
+  const ozelList = document.getElementById('filesOzelList');
+  const globalDocs = docs.filter(d => d.kapsam === 'global');
+  const ozelDocs = docs.filter(d => d.kapsam === 'ozel');
+
+  const satirHtml = d => `
+    <div class="doc-row">
+      <svg><use href="#i-file"></use></svg>
+      <span class="doc-row-name" title="${escapeHtml(d.belge_adi)}">${escapeHtml(d.belge_adi)}</span>
+      ${d.sohbet_adi ? `<span class="tag tag-mono">${escapeHtml(d.sohbet_adi)}</span>` : ''}
+      <button class="btn-ghost" data-toggle="${escapeHtml(d.belge_adi)}" data-kapsam="${d.kapsam}" style="padding:2px 8px;flex-shrink:0;">${d.kapsam === 'global' ? 'Özel yap' : 'Global yap'}</button>
+      <button class="icon-btn icon-btn-sm" data-del="${escapeHtml(d.belge_adi)}" aria-label="Sil"><svg class="i"><use href="#i-trash"></use></svg></button>
+    </div>`;
+
+  globalList.innerHTML = globalDocs.length ? globalDocs.map(satirHtml).join('') : '<p class="docs-empty">Global belge yok.</p>';
+  ozelList.innerHTML = ozelDocs.length ? ozelDocs.map(satirHtml).join('') : '<p class="docs-empty">Sohbete özel belge yok.</p>';
+
+  document.querySelectorAll('#filesDialog [data-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const yeniKapsam = btn.dataset.kapsam === 'global' ? 'ozel' : 'global';
+      if (yeniKapsam === 'ozel' && !activeConvId) { toast('Aktif sohbet yok.', 'err'); return; }
+      await fetch(`/api/documents/${encodeURIComponent(btn.dataset.toggle)}/kapsam`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kapsam: yeniKapsam, conv_id: activeConvId })
+      });
+      await loadAllDocuments();
+      await loadDocuments();
+    });
+  });
+  document.querySelectorAll('#filesDialog [data-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await deleteDoc(btn.dataset.del);
+      await loadAllDocuments();
+    });
+  });
 }
 
-// ─── Start ────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', init);
+async function loadAllDocuments() {
+  const res = await fetch('/api/documents/all');
+  const data = await res.json();
+  renderFilesDialog(data.documents);
+}
+
+const filesDialog = document.getElementById('filesDialog');
+document.getElementById('filesManageBtn').addEventListener('click', async () => {
+  await loadAllDocuments();
+  filesDialog.showModal();
+});
+document.getElementById('filesDialogClose').addEventListener('click', () => filesDialog.close());
+
+document.getElementById('filesUploadOzelBtn').addEventListener('click', () => {
+  document.getElementById('filesDialogInput').dataset.kapsam = 'ozel';
+  document.getElementById('filesDialogInput').click();
+});
+document.getElementById('filesUploadGlobalBtn').addEventListener('click', () => {
+  document.getElementById('filesDialogInput').dataset.kapsam = 'global';
+  document.getElementById('filesDialogInput').click();
+});
+document.getElementById('filesDialogInput').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const kapsam = e.target.dataset.kapsam || 'ozel';
+  await uploadFiles(e.target.files, kapsam);
+  await loadAllDocuments();
+  e.target.value = '';
+});
+
+// ─── Drag & drop (whole window) ────────────────────────────────────────
+const dropOverlay = document.getElementById('dropOverlay');
+let dragDepth = 0;
+window.addEventListener('dragenter', e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  dragDepth++; dropOverlay.classList.add('active');
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (dragDepth === 0) dropOverlay.classList.remove('active'); });
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  dragDepth = 0; dropOverlay.classList.remove('active');
+  const files = e.dataTransfer.files;
+  if (files.length) uploadFiles(files);
+});
+
+// ─── Start ──────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', girisDurumunuKontrolEtVeBaslat);
 </script>
+
+<!-- Welcome screen template (used to restore after clearMessages) -->
+<template id="welcomeTemplate">
+  <div class="welcome" id="welcomeScreen">
+    <svg class="welcome-mark"><use href="#i-mark"></use></svg>
+    <h1>Akademik Asistan'a hoş geldiniz</h1>
+    <p>Öğrenci ve ders sorguları, yüklediğiniz belgeler, web araması ve genel sorularınız için buradayım.</p>
+    <div class="welcome-chips">
+      <button class="chip" data-chip="Okulda kaç öğrenci var?">Öğrenci sayısı</button>
+      <button class="chip" data-chip="Hangi bölümler var?">Bölümler</button>
+      <button class="chip" data-chip="Yapay Zeka dersini kim veriyor?">Ders sorgusu</button>
+      <button class="chip" data-chip="Yüklü belgeler neler?">Belgeler</button>
+      <button class="chip" data-chip="Yapay zeka nedir?">İnternet araması</button>
+    </div>
+  </div>
+</template>
+
 </body>
 </html>
