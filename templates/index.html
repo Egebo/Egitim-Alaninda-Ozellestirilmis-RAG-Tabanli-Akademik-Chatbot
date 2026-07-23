@@ -1384,6 +1384,19 @@ function handleStepEvent(block, olay) {
       lbl.textContent = lbl.dataset.done;
       if (olay.kaynak) item.querySelector('.step-source').textContent = olay.kaynak;
     }
+  } else if (olay.type === 'degerlendiriliyor') {
+    const item = list.querySelector(`.step-item[data-tool="${olay.tool}"]`);
+    if (item) {
+      item.classList.remove('done', 'pending'); item.classList.add('active');
+      item.querySelector('.step-label').textContent = 'Sonuç değerlendiriliyor…';
+    }
+    summaryLabel.textContent = 'Sonuç değerlendiriliyor…';
+  } else if (olay.type === 'yeniden_deneniyor') {
+    const item = list.querySelector(`.step-item[data-tool="${olay.tool}"]`);
+    if (item) {
+      item.querySelector('.step-label').textContent = 'Daha net bir soruyla tekrar deneniyor…';
+    }
+    summaryLabel.textContent = 'Daha net bir soruyla tekrar deneniyor…';
   } else if (olay.type === 'birlestiriliyor') {
     list.insertAdjacentHTML('beforeend', `
       <li class="step-item active" data-tool="_merge">
