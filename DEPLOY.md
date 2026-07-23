@@ -10,9 +10,14 @@ tamamlanmadan (özellikle "Prod güvenlik" bölümü) sistemi internete açma.
 
 ## 0. Ön koşullar
 
-- DigitalOcean hesabı (öğrenci kredisiyle)
-- (Önerilir) bir domain — Let's Encrypt sertifikası domain ister, çıplak IP'ye
-  ücretsiz HTTPS alınamaz. Domain'in yoksa Bölüm 6'daki "Domain'siz" notuna bak.
+- DigitalOcean hesabı (öğrenci kredisiyle — droplet ücreti oradan düşer, cepten
+  çıkmaz)
+- Domain **gerekmiyor**. Let's Encrypt sertifikası çıplak IP'ye verilmez ama
+  gerçek bir domain almana da gerek yok: [sslip.io](https://sslip.io) IP'ni
+  otomatik bir hostname'e çevirir (örn. droplet IP'n `164.90.12.34` ise
+  hostname `164-90-12-34.sslip.io` olur) ve bu gerçek/çözümlenebilir bir DNS
+  kaydı olduğu için certbot bu isme de ücretsiz sertifika verir. Bölüm 2 ve 8
+  bunu kullanıyor — hiçbir yerde para ödemiyorsun.
 - SSH anahtarın (yoksa: `ssh-keygen -t ed25519`)
 
 ## 1. Droplet oluştur (DO web konsolu)
@@ -27,13 +32,22 @@ tamamlanmadan (özellikle "Prod güvenlik" bölümü) sistemi internete açma.
 5. Authentication: SSH key (şifre değil) ekle
 6. Hostname: `academic-chatbot` gibi bir isim ver, Create Droplet
 
-Oluşunca bir public IP alacaksın (örn. `164.90.x.x`).
+Oluşunca bir public IP alacaksın (örn. `164.90.12.34`).
 
-## 2. (Varsa) Domain'i droplet'e yönlendir
+## 2. Hostname'ini belirle (domain almadan, ücretsiz)
 
-DNS sağlayıcında (Namecheap, Cloudflare, vb.) bir **A kaydı** ekle:
-`ALAN_ADIN` (veya `chatbot.ALAN_ADIN`) → droplet'in public IP'si.
-Yayılması birkaç dakika-birkaç saat sürebilir (`nslookup ALAN_ADIN` ile kontrol et).
+Gerçek bir domain'in varsa onu kullan (bir A kaydıyla droplet IP'sine
+yönlendir). Yoksa hiçbir şey kurman/satın alman gerekmiyor — IP'ni
+`sslip.io` formatına çevir:
+
+```
+IP:       164.90.12.34
+Hostname: 164-90-12-34.sslip.io
+```
+
+(Noktaları tire yap, sonuna `.sslip.io` ekle.) Bu, aşağıdaki bölümlerde
+geçen `ALAN_ADIN` yerine kullanacağın değer — anında çalışır, DNS
+yayılmasını beklemene bile gerek yok.
 
 ## 3. Sunucu temel kurulumu
 
@@ -114,19 +128,23 @@ sudo systemctl status academic-chatbot   # active (running) görmelisin
 
 ```bash
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/academic-chatbot
-sudo nano /etc/nginx/sites-available/academic-chatbot   # ALAN_ADIN'i gerçek domain'inle değiştir
+sudo nano /etc/nginx/sites-available/academic-chatbot
+# ALAN_ADIN'i Bölüm 2'de belirlediğin hostname ile değiştir — gerçek bir
+# domain'in yoksa bu, 164-90-12-34.sslip.io gibi görünecek (kendi IP'nle).
 sudo ln -s /etc/nginx/sites-available/academic-chatbot /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
 # HTTPS sertifikası (nginx config'ini otomatik günceller, 80->443 yönlendirmesi ekler)
+# ALAN_ADIN yerine yine aynı hostname'i (sslip.io kullanıyorsan onu) yaz.
 sudo certbot --nginx -d ALAN_ADIN
 ```
 
-Domain'in yoksa: `server_name` satırını `_` yap, sadece `http://DROPLET_IP`
-üzerinden erişilebilir kalır (certbot adımını atla). Login şifreleri şifrelenmemiş
-kanaldan gideceği için bu sadece geçici/kısa süreli demo için kabul edilebilir —
-kalıcı bir link paylaşacaksan domain alıp HTTPS kurmak (~$10/yıl) daha doğru.
+sslip.io ile de gerçek bir Let's Encrypt sertifikası alırsın — HTTP'ye düşmüyorsun,
+login bilgileri şifreli kanaldan gider. Tek fark: link `164-90-12-34.sslip.io`
+gibi görünür, `senin-adin.com` gibi değil. İş başvurusu/jüri linki için yeterli;
+istersen ileride gerçek bir domain alıp sadece bu bölümü tekrar çalıştırman
+yeterli.
 
 ## 9. Doğrulama
 
