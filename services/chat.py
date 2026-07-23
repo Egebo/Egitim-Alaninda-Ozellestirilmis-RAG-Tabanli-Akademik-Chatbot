@@ -8,8 +8,11 @@ from core import conversation_store as depo
 from services.orchestrator import gorev_plani_olustur, adim_calistir, sonuclari_birlestir, genel_cevap_uret
 from services.gap_analysis import cevap_eksik_mi, boslugu_kapat
 from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi, gunluk_butce_asildi_mi, gunluk_maliyete_ekle
+from services.reflection import yansit
 
 logger = logging.getLogger(__name__)
+
+YANSITILACAK_ARACLAR = {'DB_QUERY', 'RAG', 'SEARCH'}
 
 
 def soruyu_baglamla_guncelle(soru: str, gecmis: str, llm=None) -> str:
@@ -169,8 +172,18 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
         for i, adim in enumerate(adimlar, start=1):
             yield {'type': 'adim_basladi', 'tool': adim['tool'], 'index': i, 'toplam': len(adimlar)}
             sonuc = adim_calistir(adim, gecmis, llm, model_name, conv_id)
-            sonuclar.append(sonuc)
             yield {'type': 'adim_bitti', 'tool': sonuc['tool'], 'kaynak': sonuc['kaynak']}
+
+            if adim['tool'] in YANSITILACAK_ARACLAR:
+                yield {'type': 'degerlendiriliyor', 'tool': sonuc['tool']}
+                yansima = yansit(adim['soru'], sonuc['cevap'], sonuc['kaynak'], llm)
+                if not yansima['yeterli'] and yansima['rafine_soru']:
+                    yield {'type': 'yeniden_deneniyor', 'tool': sonuc['tool']}
+                    rafine_adim = {'tool': adim['tool'], 'soru': yansima['rafine_soru']}
+                    sonuc = adim_calistir(rafine_adim, gecmis, llm, model_name, conv_id)
+                    yield {'type': 'adim_bitti', 'tool': sonuc['tool'], 'kaynak': sonuc['kaynak']}
+
+            sonuclar.append(sonuc)
 
         # Boşluk analizi: birincil araçlar (DB_QUERY/RAG) sonuçsuz kaldıysa,
         # daha önce denenmediyse tek seferlik bir SEARCH adımıyla tamamlamayı dene.
