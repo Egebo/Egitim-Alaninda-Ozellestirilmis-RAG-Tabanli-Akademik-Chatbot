@@ -7,7 +7,7 @@ from core.lazy_imports import ensure_imports
 from core import conversation_store as depo
 from services.orchestrator import gorev_plani_olustur, adim_calistir, sonuclari_birlestir, genel_cevap_uret
 from services.gap_analysis import cevap_eksik_mi, boslugu_kapat
-from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi
+from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi, gunluk_butce_asildi_mi, gunluk_maliyete_ekle
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +126,23 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
         }
         return
 
+    # Guardrail: herkese açık demo dağıtımında günlük harcama tavanı aşıldıysa
+    # orkestratöre hiç girmeden, sıfır ek maliyetle reddet (bkz. DEPLOY.md).
+    butce_asildi, butce_mesaji = gunluk_butce_asildi_mi()
+    if butce_asildi:
+        conv['history'].append({
+            'user': soru, 'cevap': butce_mesaji, 'cevap_norag': None,
+            'kaynak': 'Güvenlik', 'tokens': 0, 'cost': 0.0, 'niyet': 'GUARDRAIL'
+        })
+        depo.mesaj_ekle(conv_id, conv['history'][-1], len(conv['history']), conv['tokens'], conv['cost'])
+        yield {
+            'type': 'final',
+            'cevap': butce_mesaji, 'cevap_norag': None, 'kaynak': 'Güvenlik', 'niyet': 'GUARDRAIL',
+            'tokens': conv['tokens'], 'cost': f'${conv["cost"]:.5f}',
+            'msg_tokens': 0, 'msg_cost': '$0.00000', 'sohbet_ismi': None
+        }
+        return
+
     ilk_mesaj_mi = len(conv['history']) == 0
 
     gecmis = '\n'.join(
@@ -193,6 +210,7 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
 
     msg_tokens = state.global_tokens - tokens_before
     msg_cost = state.global_cost_usd - cost_before
+    gunluk_maliyete_ekle(msg_cost)
 
     conv['history'].append({
         'user': soru,

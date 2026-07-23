@@ -18,6 +18,8 @@ class AppState:
         self.example_prompt = None       # Örnek SQL şablon yapısı
         self.global_tokens = 0           # Sunucu genelinde harcanan toplam token sayısı
         self.global_cost_usd = 0.0       # Sunucu genelinde oluşan toplam API maliyeti (USD)
+        self.gunluk_maliyet_usd = 0.0    # Bugün oluşan API maliyeti (USD), gün değişince sıfırlanır
+        self.gunluk_maliyet_tarihi = None  # gunluk_maliyet_usd'nin ait olduğu tarih (date)
         self.conversations = {}          # Tüm sohbetler: {conv_id: {...}}
         self.active_conv_id = None       # Aktif sohbet id'si
         self.conv_counter = 0            # Sohbet id üretici sayaç

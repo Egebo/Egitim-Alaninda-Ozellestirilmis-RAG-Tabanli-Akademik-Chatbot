@@ -1,0 +1,4 @@
+# Sadece production (Linux) dağıtımında gerekli ek bağımlılık — gunicorn
+# Windows'ta desteklenmez, bu yüzden ana requirements.txt'e eklenmedi.
+# Kurulum: pip install -r requirements.txt -r requirements-deploy.txt
+gunicorn>=22.0.0

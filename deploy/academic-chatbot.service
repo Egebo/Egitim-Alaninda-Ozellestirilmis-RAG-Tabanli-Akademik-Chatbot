@@ -1,0 +1,28 @@
+[Unit]
+Description=Academic RAG Chatbot (gunicorn)
+After=network.target
+
+[Service]
+# --- ORTAMA GORE DEGISTIR ---
+User=chatbot
+Group=chatbot
+WorkingDirectory=/opt/academic-chatbot
+EnvironmentFile=/opt/academic-chatbot/.env
+ExecStart=/opt/academic-chatbot/venv/bin/gunicorn \
+    --workers 1 --threads 4 \
+    --timeout 120 \
+    --bind 127.0.0.1:5000 \
+    app:app
+
+# --workers 1: uygulamanin paylasilan durumu (core/state.py::AppState — sohbetler,
+# gunluk butce sayaci, token/maliyet toplamlari) tek bir process icindeki bellekte
+# tutuluyor. Birden fazla worker acilirsa her biri kendi kopyasini tutar ve ayni
+# kullanicinin farkli isteklerinin farkli worker'a dusmesi tutarsizliga yol acar
+# (ornegin gunluk butce tavani gercekte N worker sayisi kadar katlanir). Bu
+# projenin trafik hacminde (demo amacli) tek worker yeterli; --threads 4 ile
+# ayni process icinde sinirli concurrency saglanir.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

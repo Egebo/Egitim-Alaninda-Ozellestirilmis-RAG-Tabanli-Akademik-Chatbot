@@ -3,9 +3,18 @@ Orkestratöre girmeden önce (girdi) ve kullanıcıya dönmeden önce (çıktı)
 basit, ücretsiz (kural tabanlı) güvenlik kontrolleri. LLM çağırmaz — mevcut
 kural-önce-LLM-sonra felsefesiyle tutarlı, her mesaja ekstra maliyet bindirmez.
 """
+import os
 import re
+from datetime import date
+
+from core.state import state
 
 MAX_SORU_UZUNLUGU = 4000
+
+# Herkese açık demo dağıtımında (bkz. DEPLOY.md) yabancı ziyaretçilerin OpenAI/Gemini
+# faturasını kontrolsüz büyütmesini engelleyen günlük harcama tavanı. .env'de
+# DAILY_BUDGET_USD ile değiştirilebilir; yerel geliştirmede pratikte hiç dokunulmaz.
+GUNLUK_BUTCE_USD = float(os.environ.get('DAILY_BUDGET_USD', '3.0'))
 
 # Prompt injection / talimat ele geçirme girişimlerinde geçen yaygın kalıplar.
 # META niyetiyle (chatbotun kendi durumu hakkında soru) karışmasın diye "talimatlarını
@@ -66,3 +75,28 @@ def cikti_guvenli_mi(cevap: str) -> tuple:
             temiz = desen.sub('[GİZLİ BİLGİ KALDIRILDI]', temiz)
 
     return temiz, sizinti_var
+
+
+def _gunluk_sayaci_gerekirse_sifirla():
+    bugun = date.today()
+    if state.gunluk_maliyet_tarihi != bugun:
+        state.gunluk_maliyet_tarihi = bugun
+        state.gunluk_maliyet_usd = 0.0
+
+
+def gunluk_butce_asildi_mi() -> tuple:
+    """
+    Orkestratöre gitmeden önce günlük harcama tavanının aşılıp aşılmadığını
+    kontrol eder. Aşılmışsa (True, kullanıcıya gösterilecek mesaj), aksi halde
+    (False, None) döner.
+    """
+    _gunluk_sayaci_gerekirse_sifirla()
+    if state.gunluk_maliyet_usd >= GUNLUK_BUTCE_USD:
+        return True, 'Bugünkü demo kullanım kotası doldu. Lütfen yarın tekrar deneyin.'
+    return False, None
+
+
+def gunluk_maliyete_ekle(maliyet_usd: float):
+    """Bir isteğin gerçek maliyetini günlük sayaca ekler (chat.py, her istek sonunda çağırır)."""
+    _gunluk_sayaci_gerekirse_sifirla()
+    state.gunluk_maliyet_usd += maliyet_usd

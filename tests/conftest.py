@@ -45,6 +45,8 @@ def fresh_state():
     state.example_prompt = None
     state.global_tokens = 0
     state.global_cost_usd = 0.0
+    state.gunluk_maliyet_usd = 0.0
+    state.gunluk_maliyet_tarihi = None
     state.conversations = {}
     state.active_conv_id = None
     state.conv_counter = 0

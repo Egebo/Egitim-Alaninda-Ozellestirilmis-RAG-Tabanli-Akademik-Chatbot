@@ -65,6 +65,11 @@ demo_db_hazirla()  # kullanicilar tablosunun (login için) var olduğundan emin 
 konusmalari_diskten_yukle()  # conversations.db'den mevcut sohbetleri yükle (yoksa yeni bir tane oluştur)
 
 if __name__ == '__main__':
+    # debug=True acilis modu, Werkzeug'un interaktif hata konsolunu acar: bir
+    # exception olustugunda tarayicidan sunucuda keyfi Python kodu calistirilabilir.
+    # Sadece FLASK_DEBUG=1 ile yerel gelistirmede acik; herkese acik/production
+    # ortamda (bkz. DEPLOY.md) bu blok hic calismaz, gunicorn 'app:app'i dogrudan import eder.
+    debug_modu = os.environ.get('FLASK_DEBUG', '0') == '1'
     logger.info('🚀 Akademik Chatbot başlatılıyor...')
     logger.info('📌 http://localhost:5000 adresinde çalışıyor')
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug_modu, host='0.0.0.0', port=5000)

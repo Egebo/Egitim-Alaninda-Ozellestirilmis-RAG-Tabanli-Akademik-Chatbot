@@ -1,4 +1,9 @@
-from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi, MAX_SORU_UZUNLUGU
+from datetime import date, timedelta
+
+from services.guardrails import (
+    girdi_guvenli_mi, cikti_guvenli_mi, MAX_SORU_UZUNLUGU,
+    gunluk_butce_asildi_mi, gunluk_maliyete_ekle, GUNLUK_BUTCE_USD,
+)
 
 
 def test_injection_kalibi_reddedilir():
@@ -39,3 +44,27 @@ def test_sirsiz_cevap_degismez():
     temiz, sizinti_var = cikti_guvenli_mi(cevap)
     assert sizinti_var is False
     assert temiz == cevap
+
+
+def test_gunluk_butce_asilmadiginda_gecer(fresh_state):
+    asildi, mesaj = gunluk_butce_asildi_mi()
+    assert asildi is False
+    assert mesaj is None
+
+
+def test_gunluk_butce_asilinca_reddedilir(fresh_state):
+    gunluk_maliyete_ekle(GUNLUK_BUTCE_USD)
+    asildi, mesaj = gunluk_butce_asildi_mi()
+    assert asildi is True
+    assert 'kota' in mesaj.lower()
+
+
+def test_gun_degisince_sayac_sifirlanir(fresh_state):
+    gunluk_maliyete_ekle(GUNLUK_BUTCE_USD)
+    fresh_state.gunluk_maliyet_tarihi = date.today() - timedelta(days=1)
+
+    asildi, mesaj = gunluk_butce_asildi_mi()
+
+    assert asildi is False
+    assert fresh_state.gunluk_maliyet_usd == 0.0
+    assert fresh_state.gunluk_maliyet_tarihi == date.today()
