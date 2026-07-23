@@ -28,3 +28,6 @@ Bitirme Dosyaları/
 # klasorler — bu projeyle alakasiz, yanlislikla commit'lenmesin
 react_uygulama/
 tasarim_projesi/
+
+# Claude Code'un kendi oturum/worktree durumu — koda ait degil
+.claude/
