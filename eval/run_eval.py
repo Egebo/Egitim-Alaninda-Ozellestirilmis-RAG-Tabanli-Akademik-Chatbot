@@ -6,8 +6,14 @@ parcasi DEGILDIR, CI'da otomatik calismaz — elle `python eval/run_eval.py` ile
 calistirilir. OPENAI_API_KEY .env dosyasindan okunur.
 """
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
+
+# `python eval/run_eval.py` seklinde dogrudan calistirildiginda proje koku
+# sys.path'te olmuyor (pytest'te pytest.ini'deki pythonpath=. bunu hallediyor,
+# burada elle eklememiz gerekiyor).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
 
