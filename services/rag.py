@@ -1,4 +1,5 @@
 """Yüklenen belgeler üzerinde RAG (Retrieval-Augmented Generation) sorgulama."""
+import logging
 import os
 import shutil
 
@@ -6,9 +7,12 @@ from core.state import state
 from core.llm import llm_invoke_tracked, extract_text
 from core import document_store as belge_deposu
 
+logger = logging.getLogger(__name__)
+
 SIMILARITY_THRESHOLD = 0.45
 MAX_TOTAL_CHUNKS = 20
 FALLBACK_THRESHOLD = 0.1
+DESTEKLENEN_UZANTILAR = ('pdf', 'xlsx', 'xls', 'txt')
 
 # multilingual-e5-small'in max_seq_length'i 512 token; 400/80 güvenli pay birakiyor
 # (özel token'lar + olasi kirpma icin), karakter degil GERCEK model token sayisiyla olculuyor.
@@ -21,10 +25,36 @@ def _k_per_doc(n_docs: int) -> int:
 
 
 class RagManager:
-    def __init__(self, cache_dir='./chroma_db'):
+    def __init__(self, cache_dir='./chroma_db', upload_dir='uploads'):
         self.cache_dir = cache_dir
+        self.upload_dir = upload_dir
         self.documents = {}
         self.db = None
+
+    def diskten_yukle(self):
+        """
+        uploads/ klasorundeki her desteklenen dosya icin, karsilik gelen
+        chroma_db/<guvenli_isim>/ klasoru varsa (daha once embed edilmis ve
+        silinmemis) yeniden embed etmeden baglanip self.documents'a ekler.
+        Klasor yoksa ya da baglanti basarisiz olursa o belge atlanir, loglanir.
+        """
+        if not os.path.isdir(self.upload_dir):
+            return
+        for dosya_adi in os.listdir(self.upload_dir):
+            ext = dosya_adi.rsplit('.', 1)[-1].lower() if '.' in dosya_adi else ''
+            if ext not in DESTEKLENEN_UZANTILAR:
+                continue
+            if dosya_adi in self.documents:
+                continue
+            safe = dosya_adi.replace('.', '_').replace(' ', '_')
+            doc_persist_dir = os.path.join(self.cache_dir, safe)
+            if not os.path.isdir(doc_persist_dir):
+                continue
+            try:
+                vs = _Chroma(persist_directory=doc_persist_dir, embedding_function=self.embeddings)
+                self.documents[dosya_adi] = {'vector_store': vs}
+            except Exception:
+                logger.warning(f'⚠️ {dosya_adi} diskten geri yuklenemedi, atlaniyor', exc_info=True)
 
     @property
     def embeddings(self):

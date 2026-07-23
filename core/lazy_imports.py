@@ -123,6 +123,7 @@ def ensure_imports():
     # ── Belge Analiz Yöneticisi (RAG Manager) Kurulumu ────────────────────────
     state.rag_manager = RagManager()
     state.rag_manager.db = state.db
+    state.rag_manager.diskten_yukle()
 
     # ── İnternet Arama Motoru Entegrasyonu ────────────────────────────────────
     try:
