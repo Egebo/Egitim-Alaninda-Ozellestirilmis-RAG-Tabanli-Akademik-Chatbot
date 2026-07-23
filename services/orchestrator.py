@@ -2,6 +2,7 @@
 Kullanıcı sorusunu bir görev listesine (to-do list) dönüştürüp sırayla çalıştıran orkestratör.
 Ayrıca tek-adımlık GENERAL/SEARCH sorularında kullanılan genel sohbet ve internet arama yardımcılarını içerir.
 """
+import logging
 import re
 
 from pydantic import BaseModel, Field
@@ -9,6 +10,8 @@ from pydantic import BaseModel, Field
 from core.state import state
 from core.llm import llm_invoke_tracked, extract_text
 from services.text_to_sql import sql_uret_ve_calistir, db_sonuc_formatla
+
+logger = logging.getLogger(__name__)
 
 GECERLI_ARACLAR = ['DB_QUERY', 'RAG', 'SEARCH', 'META', 'GENERAL']
 
@@ -170,7 +173,7 @@ Soru: "{soru}\""""
         if gecerli_adimlar:
             return gecerli_adimlar
     except Exception:
-        pass
+        logger.exception('Görev planı çıkarılamadı (bind_tools/invoke hatası), GENERAL\'a düşülüyor')
 
     return [{'tool': 'GENERAL', 'soru': soru}]
 
