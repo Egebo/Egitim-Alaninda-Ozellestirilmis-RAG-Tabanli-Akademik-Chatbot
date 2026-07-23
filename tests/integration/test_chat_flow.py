@@ -3,7 +3,7 @@ Gercek LLM/API cagrisi yapilmaz: adim_calistir, gorev_plani_olustur, _get_llm ve
 sonuclari_birlestir mock'lanir; sadece orkestrasyonun kablolamasi (wiring) dogrulanir."""
 from core.state import state
 from services.conversations import _new_conv
-from services.chat import chat_yanit_uret
+from services.chat import chat_yanit_uret, chat_yanit_uret_stream
 
 
 def test_guardrail_injection_erken_reddedilir(fresh_state):
@@ -125,3 +125,56 @@ def test_gap_analysis_search_adimi_ekler(mocker, fresh_state, sahte_llm):
     assert sonuc['niyet'] == 'DB_QUERY+SEARCH'
     assert sonuc['kaynak'] == 'Veritabanı+İnternet'
     assert sonuc['cevap'] == 'Birleştirilmiş yanıt'
+
+
+def test_yansima_yeterliyse_tekrar_denenmez(mocker, fresh_state, sahte_llm):
+    conv_id = _new_conv()
+    mocker.patch('services.chat._get_llm', return_value=sahte_llm())
+    mocker.patch('services.chat.gorev_plani_olustur', return_value=[{'tool': 'RAG', 'soru': 'CVdeki deneyim ne'}])
+    adim_mock = mocker.patch('services.chat.adim_calistir', return_value={
+        'tool': 'RAG', 'soru': 'CVdeki deneyim ne', 'cevap': '5 yıl deneyim', 'kaynak': 'Belgeler'
+    })
+    mocker.patch('services.chat.yansit', return_value={'yeterli': True, 'rafine_soru': ''})
+
+    olaylar = list(chat_yanit_uret_stream('CVdeki deneyim ne', conv_id, 'chatgpt'))
+
+    tipler = [o['type'] for o in olaylar]
+    assert 'degerlendiriliyor' in tipler
+    assert 'yeniden_deneniyor' not in tipler
+    assert adim_mock.call_count == 1
+
+
+def test_yansima_yetersizse_rafine_soruyla_tekrar_denenir(mocker, fresh_state, sahte_llm):
+    conv_id = _new_conv()
+    mocker.patch('services.chat._get_llm', return_value=sahte_llm())
+    mocker.patch('services.chat.gorev_plani_olustur', return_value=[{'tool': 'RAG', 'soru': 'deneyim ne'}])
+    mocker.patch('services.chat.adim_calistir', side_effect=[
+        {'tool': 'RAG', 'soru': 'deneyim ne', 'cevap': 'Yeterli bilgi bulunmamaktadir.', 'kaynak': 'Belgeler'},
+        {'tool': 'RAG', 'soru': 'CVdeki is deneyimi kac yil', 'cevap': '5 yıl deneyim', 'kaynak': 'Belgeler'},
+    ])
+    mocker.patch('services.chat.yansit', return_value={'yeterli': False, 'rafine_soru': 'CVdeki is deneyimi kac yil'})
+
+    olaylar = list(chat_yanit_uret_stream('deneyim ne', conv_id, 'chatgpt'))
+
+    tipler = [o['type'] for o in olaylar]
+    assert 'degerlendiriliyor' in tipler
+    assert 'yeniden_deneniyor' in tipler
+    assert tipler.count('adim_bitti') == 2
+    final = [o for o in olaylar if o['type'] == 'final'][0]
+    assert final['cevap'] == '5 yıl deneyim'
+
+
+def test_general_adiminda_yansima_calismaz(mocker, fresh_state, sahte_llm):
+    conv_id = _new_conv()
+    mocker.patch('services.chat._get_llm', return_value=sahte_llm())
+    mocker.patch('services.chat.gorev_plani_olustur', return_value=[{'tool': 'GENERAL', 'soru': 'selam'}])
+    mocker.patch('services.chat.adim_calistir', return_value={
+        'tool': 'GENERAL', 'soru': 'selam', 'cevap': 'Merhaba!', 'kaynak': 'Sohbet'
+    })
+    yansit_mock = mocker.patch('services.chat.yansit')
+
+    olaylar = list(chat_yanit_uret_stream('selam', conv_id, 'chatgpt'))
+
+    tipler = [o['type'] for o in olaylar]
+    assert 'degerlendiriliyor' not in tipler
+    yansit_mock.assert_not_called()
