@@ -43,3 +43,19 @@ def boslugu_kapat(soru: str, sonuclar: list, gecmis: str, llm, model_name: str) 
         return sonuclar
     arama_sonucu = adim_calistir({'tool': 'SEARCH', 'soru': soru}, gecmis, llm, model_name)
     return sonuclar + [arama_sonucu]
+
+
+def tum_sonuclar_eksik_mi(sonuclar: list) -> bool:
+    """
+    Coklu adimli bir planda TUM adimlarin sonucu bilgi icermiyorsa True doner.
+    cevap_eksik_mi'den farki: sadece DB_QUERY/RAG degil, TUM araclarin (SEARCH
+    dahil) sonucuna bakar — birlestirme adiminin bos/ilgisiz parcalardan hikaye
+    uydurmasini (halusinasyon) onlemek icin kullanilir.
+    """
+    if not sonuclar:
+        return False
+    for s in sonuclar:
+        cevap_lower = (s['cevap'] or '').lower()
+        if not any(ifade in cevap_lower for ifade in EKSIK_BILGI_IFADELERI):
+            return False
+    return True

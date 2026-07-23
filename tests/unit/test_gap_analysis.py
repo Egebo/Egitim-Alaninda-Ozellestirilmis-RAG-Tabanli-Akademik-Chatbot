@@ -1,4 +1,4 @@
-from services.gap_analysis import cevap_eksik_mi, boslugu_kapat
+from services.gap_analysis import cevap_eksik_mi, boslugu_kapat, tum_sonuclar_eksik_mi
 
 
 def test_db_query_bos_sonuc_eksik_sayilir():
@@ -44,3 +44,23 @@ def test_boslugu_kapat_search_zaten_denenmisse_tekrar_eklemez(mocker):
 
     assert yeni_sonuclar == sonuclar
     mock_adim_calistir.assert_not_called()
+
+
+def test_tum_sonuclar_eksik_ise_true():
+    sonuclar = [
+        {'tool': 'DB_QUERY', 'cevap': 'Aradığınız kriterlere uygun kayıt bulunamadı.', 'kaynak': 'Veritabanı'},
+        {'tool': 'SEARCH', 'cevap': 'yeterli bilgi bulunmamaktadır', 'kaynak': 'İnternet'},
+    ]
+    assert tum_sonuclar_eksik_mi(sonuclar) is True
+
+
+def test_bir_sonuc_gercek_bilgi_icerirse_false():
+    sonuclar = [
+        {'tool': 'DB_QUERY', 'cevap': 'Aradığınız kriterlere uygun kayıt bulunamadı.', 'kaynak': 'Veritabanı'},
+        {'tool': 'SEARCH', 'cevap': 'Ali Kaya 5 yıl deneyimli bir yazılımcı.', 'kaynak': 'İnternet'},
+    ]
+    assert tum_sonuclar_eksik_mi(sonuclar) is False
+
+
+def test_bos_liste_false_doner():
+    assert tum_sonuclar_eksik_mi([]) is False

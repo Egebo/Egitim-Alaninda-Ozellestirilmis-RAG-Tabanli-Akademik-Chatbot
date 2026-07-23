@@ -3,7 +3,7 @@ Gercek LLM/API cagrisi yapilmaz: adim_calistir, gorev_plani_olustur, _get_llm ve
 sonuclari_birlestir mock'lanir; sadece orkestrasyonun kablolamasi (wiring) dogrulanir."""
 from core.state import state
 from services.conversations import _new_conv
-from services.chat import chat_yanit_uret, chat_yanit_uret_stream
+from services.chat import chat_yanit_uret, chat_yanit_uret_stream, BILGI_BULUNAMADI_MESAJI
 
 
 def test_guardrail_injection_erken_reddedilir(fresh_state):
@@ -178,3 +178,25 @@ def test_general_adiminda_yansima_calismaz(mocker, fresh_state, sahte_llm):
     tipler = [o['type'] for o in olaylar]
     assert 'degerlendiriliyor' not in tipler
     yansit_mock.assert_not_called()
+
+
+def test_tum_sonuclar_eksikse_birlestirme_atlanir(mocker, fresh_state, sahte_llm):
+    conv_id = _new_conv()
+    mocker.patch('services.chat._get_llm', return_value=sahte_llm())
+    mocker.patch('services.chat.gorev_plani_olustur', return_value=[
+        {'tool': 'DB_QUERY', 'soru': 'soru1'},
+        {'tool': 'SEARCH', 'soru': 'soru2'},
+    ])
+    mocker.patch('services.chat.adim_calistir', side_effect=[
+        {'tool': 'DB_QUERY', 'soru': 'soru1', 'cevap': 'Aradığınız kriterlere uygun kayıt bulunamadı.', 'kaynak': 'Veritabanı'},
+        {'tool': 'SEARCH', 'soru': 'soru2', 'cevap': 'yeterli bilgi bulunmamaktadır', 'kaynak': 'İnternet'},
+    ])
+    birlestir_mock = mocker.patch('services.chat.sonuclari_birlestir')
+
+    olaylar = list(chat_yanit_uret_stream('soru1 ve soru2', conv_id, 'chatgpt'))
+
+    birlestir_mock.assert_not_called()
+    tipler = [o['type'] for o in olaylar]
+    assert 'birlestiriliyor' not in tipler
+    final = [o for o in olaylar if o['type'] == 'final'][0]
+    assert final['cevap'] == BILGI_BULUNAMADI_MESAJI

@@ -6,13 +6,17 @@ from core.llm import _get_llm, llm_invoke_tracked, extract_text
 from core.lazy_imports import ensure_imports
 from core import conversation_store as depo
 from services.orchestrator import gorev_plani_olustur, adim_calistir, sonuclari_birlestir, genel_cevap_uret
-from services.gap_analysis import cevap_eksik_mi, boslugu_kapat
+from services.gap_analysis import cevap_eksik_mi, boslugu_kapat, tum_sonuclar_eksik_mi
 from services.guardrails import girdi_guvenli_mi, cikti_guvenli_mi, gunluk_butce_asildi_mi, gunluk_maliyete_ekle
 from services.reflection import yansit
 
 logger = logging.getLogger(__name__)
 
 YANSITILACAK_ARACLAR = {'DB_QUERY', 'RAG', 'SEARCH'}
+BILGI_BULUNAMADI_MESAJI = (
+    'Bu konuda veritabanında, yüklü belgelerde veya internette güvenilir bir '
+    'bilgi bulamadım. Sorunuzu farklı bir şekilde ifade etmeyi deneyebilirsiniz.'
+)
 
 
 def soruyu_baglamla_guncelle(soru: str, gecmis: str, llm=None) -> str:
@@ -196,6 +200,9 @@ def _chat_akisi(soru: str, conv_id: str, model_name: str = 'chatgpt', karsilasti
         if len(sonuclar) == 1:
             cevap = sonuclar[0]['cevap']
             kaynak = sonuclar[0]['kaynak']
+        elif tum_sonuclar_eksik_mi(sonuclar):
+            cevap = BILGI_BULUNAMADI_MESAJI
+            kaynak = '+'.join(dict.fromkeys(s['kaynak'] for s in sonuclar))
         else:
             yield {'type': 'birlestiriliyor'}
             cevap = sonuclari_birlestir(soru_baglamli, sonuclar, llm)
