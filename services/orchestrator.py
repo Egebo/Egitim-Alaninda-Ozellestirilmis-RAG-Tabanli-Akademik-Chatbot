@@ -58,7 +58,11 @@ def internet_arama_yap(soru: str, llm=None) -> str:
     try:
         sonuc = state.search_tool.run(soru)
         return extract_text(llm_invoke_tracked(llm,
-            f'Arama sonuçlarına dayanarak Türkçe cevap ver.\nSoru: {soru}\nSonuçlar: {sonuc}\nCevap:'
+            f'Arama sonuçlarına dayanarak Türkçe cevap ver. Eğer arama sonuçları '
+            f'soruyla gerçekten ilgili değilse (örn. farklı bir kişi, yer ya da '
+            f'konu hakkındaysa), bunları kullanma ve sonuçların soruyla ilgili '
+            f'görünmediğini belirt — asla ilgisiz sonuçlardan emin bir cevap uydurma.\n'
+            f'Soru: {soru}\nSonuçlar: {sonuc}\nCevap:'
         ))
     except Exception as e:
         return f'İnternet araması yapılamadı: {e}'
@@ -254,6 +258,12 @@ def sonuclari_birlestir(soru: str, sonuclar: list, llm) -> str:
     prompt = f"""Kullanicinin sorusu birden fazla kaynaktan toplanan bilgiyle cevaplandi. Asagidaki parcalari
 tek, akici ve tutarli bir Turkce yanitta birlestir. Kaynaklari yanitin icinde dogal bir sekilde belirt,
 gereksiz tekrar yapma.
+
+ONEMLI: Parcalardan biri "bulunamadi"/"bilgi yok" turunden bir sonuc iceriyorsa,
+bunu oldugu gibi belirt — o kaynaktan gercek bilgi olmadigini gizleme. Farkli
+parcalardaki isimleri, olaylari veya kisileri birbiriyle iliskilendirerek
+varsayimsal/uydurma baglantilar KURMA. Sadece parcalarda GERCEKTEN yazili olan
+bilgiyi kullan.
 
 Kullanicinin orijinal sorusu: "{soru}"
 
