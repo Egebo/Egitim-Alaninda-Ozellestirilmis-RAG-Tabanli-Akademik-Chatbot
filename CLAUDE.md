@@ -95,7 +95,7 @@ FLASK_DEBUG=0           # 1 sadece yerel geliştirmede; prod'da asla (uzaktan ko
 
 ## Dağıtım
 
-`DEPLOY.md`: DigitalOcean Droplet + gunicorn + nginx + Let's Encrypt ile herkese
+`DEPLOY.md`: Oracle Cloud Always Free VM + gunicorn + nginx + Let's Encrypt ile herkese
 açık demo dağıtımı rehberi (`deploy/` altında systemd/nginx config'leri).
 
 ## Dosya Yapısı
@@ -109,7 +109,7 @@ academic_chatbot/
 ├── requirements.txt          # Python bağımlılıkları (yerel + prod ortak)
 ├── requirements-deploy.txt   # Sadece prod (gunicorn, Linux)
 ├── deploy/                   # systemd servis + nginx reverse proxy config'leri
-├── DEPLOY.md                 # DigitalOcean dağıtım rehberi
+├── DEPLOY.md                 # Oracle Cloud Always Free dağıtım rehberi
 ├── .env                      # API anahtarları (git'e ekleme!)
 ├── demo_okul.db               # SQLite DB (otomatik oluşturulur)
 ├── templates/index.html      # Web arayüzü

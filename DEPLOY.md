@@ -1,42 +1,63 @@
-# Dağıtım Rehberi — DigitalOcean Droplet
+# Dağıtım Rehberi — Oracle Cloud Always Free
 
 Bu rehber, chatbotu jüri/işveren gibi üçüncü kişilerin erişebileceği kalıcı bir
 public URL'de yayına almak için yazıldı (geçici tünel değil — sunucu kapalıyken
-de link çalışır). Mimari: **Droplet (Ubuntu) → gunicorn (tek worker) → nginx
-(reverse proxy + HTTPS) → Let's Encrypt**.
+de link çalışır). Mimari: **Oracle Cloud VM (Ubuntu, ARM) → gunicorn (tek
+worker) → nginx (reverse proxy + HTTPS) → Let's Encrypt**.
+
+Oracle Cloud'un "Always Free" katmanı süresiz ücretsiz (DigitalOcean'ın
+GitHub Student Pack kredisinin aksine, bu bir promosyon değil — hesap
+yaşadığı sürece geçerli). Kart doğrulaması istiyor ama Always Free kaynakları
+kullandığın sürece fatura kesmiyor.
 
 Login zaten var, bu yüzden herkes serbestçe giremiyor — ama aşağıdaki adımlar
 tamamlanmadan (özellikle "Prod güvenlik" bölümü) sistemi internete açma.
 
 ## 0. Ön koşullar
 
-- DigitalOcean hesabı (öğrenci kredisiyle — droplet ücreti oradan düşer, cepten
-  çıkmaz)
+- Oracle Cloud hesabı ([cloud.oracle.com](https://www.oracle.com/cloud/free/) →
+  "Start for free"). Kart bilgisi istiyor (doğrulama için), Always Free
+  kaynaklar için ücret çekmiyor.
 - Domain **gerekmiyor**. Let's Encrypt sertifikası çıplak IP'ye verilmez ama
   gerçek bir domain almana da gerek yok: [sslip.io](https://sslip.io) IP'ni
-  otomatik bir hostname'e çevirir (örn. droplet IP'n `164.90.12.34` ise
+  otomatik bir hostname'e çevirir (örn. sunucu IP'n `164.90.12.34` ise
   hostname `164-90-12-34.sslip.io` olur) ve bu gerçek/çözümlenebilir bir DNS
   kaydı olduğu için certbot bu isme de ücretsiz sertifika verir. Bölüm 2 ve 8
   bunu kullanıyor — hiçbir yerde para ödemiyorsun.
 - SSH anahtarın (yoksa: `ssh-keygen -t ed25519`)
 
-## 1. Droplet oluştur (DO web konsolu)
+## 1. VM oluştur (Oracle Cloud konsolu)
 
-1. Create → Droplets
-2. Image: **Ubuntu 24.04 (LTS) x64**
-3. Plan: Basic, en az **2 GB RAM / 1 vCPU** (~$12/ay). 1 GB'lık en ucuz plan,
-   HuggingFace embedding modeli (`intfloat/multilingual-e5-small`) + LangChain +
-   Chroma aynı anda bellekte açıldığında sıkışabilir — 2 GB ile aylarca $200
-   kredin yeter (~16 ay).
-4. Datacenter: sana/hedef kitleye en yakın region (örn. Frankfurt)
-5. Authentication: SSH key (şifre değil) ekle
-6. Hostname: `academic-chatbot` gibi bir isim ver, Create Droplet
+1. Konsolda hamburger menü → **Compute → Instances → Create Instance**
+2. Name: `academic-chatbot`
+3. Image and shape → **Change Image** → **Canonical Ubuntu 24.04** (Ampere/ARM
+   sürümünü seç, "aarch64" yazan)
+4. **Change Shape** → **Ampere** (ARM) ailesi → **VM.Standard.A1.Flex** →
+   "Always Free eligible" etiketli olanı seç. OCPU/RAM'i **2 OCPU / 12 GB**
+   yap (2026 ortası itibarıyla Always Free ARM limiti bu — hesabına göre daha
+   fazla gösterebilir, göstermiyorsa 2/12 yeterli, bu proje için bolca).
+5. Networking: varsayılan VCN'i kullan, **"Assign a public IPv4 address"**
+   işaretli kalsın.
+6. SSH keys: public key'ini yapıştır (`~/.ssh/id_ed25519.pub` içeriği) ya da
+   "Generate a key pair" ile Oracle'a ürettir ve private key'i indir.
+7. Create.
 
-Oluşunca bir public IP alacaksın (örn. `164.90.12.34`).
+Oluşunca **Instance Details** sayfasında bir public IP göreceksin (örn.
+`164.90.12.34`).
+
+⚠️ **Oracle'a özgü bir tuzak:** DigitalOcean'ın aksine, Oracle'da dışarıdan
+gelen trafiğe izin vermek için **iki ayrı** güvenlik duvarı katmanını açman
+gerekiyor — biri bulut tarafında (VCN Security List), biri sunucunun kendi
+iptables kuralları. Bölüm 3'te ikisi de var, atlama.
+
+**VCN Security List'i aç:** Instance Details → Subnet linkine tıkla → Security
+Lists → varsayılan listeye tıkla → **Add Ingress Rules** → Source CIDR
+`0.0.0.0/0`, IP Protocol TCP, Destination Port `80` ekle; aynı şekilde bir
+tane daha `443` için ekle. (`22`/SSH zaten varsayılanda açık gelir.)
 
 ## 2. Hostname'ini belirle (domain almadan, ücretsiz)
 
-Gerçek bir domain'in varsa onu kullan (bir A kaydıyla droplet IP'sine
+Gerçek bir domain'in varsa onu kullan (bir A kaydıyla sunucu IP'sine
 yönlendir). Yoksa hiçbir şey kurman/satın alman gerekmiyor — IP'ni
 `sslip.io` formatına çevir:
 
@@ -52,21 +73,27 @@ yayılmasını beklemene bile gerek yok.
 ## 3. Sunucu temel kurulumu
 
 ```bash
-ssh root@DROPLET_IP
+ssh ubuntu@SUNUCU_IP   # Oracle'ın Ubuntu image'inde varsayılan kullanıcı 'ubuntu', 'root' değil
 
-# Uygulamayı root yerine ayrı bir kullanıcıyla çalıştır
-adduser --disabled-password --gecos "" chatbot
-usermod -aG sudo chatbot
+# Uygulamayı ayrı bir kullanıcıyla çalıştır
+sudo adduser --disabled-password --gecos "" chatbot
+sudo usermod -aG sudo chatbot
 
-# Güvenlik duvarı: sadece SSH/HTTP/HTTPS dışa açık, 5000 (Flask/gunicorn) KAPALI
-apt update && apt install -y ufw
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
+# 1) Sunucunun KENDİ güvenlik duvarı (iptables) — Oracle'ın Ubuntu image'i
+# varsayılan olarak 80/443'ü bile bloklar, Bölüm 1'deki VCN kuralı tek başına
+# yetmez. ufw, iptables üzerine kurulu, ikisini birlikte kullanmak sorun değil.
+sudo apt update && sudo apt install -y ufw
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
 
-apt install -y python3.11 python3.11-venv python3-pip git nginx certbot python3-certbot-nginx
+sudo apt install -y python3.11 python3.11-venv python3-pip git nginx certbot python3-certbot-nginx
 ```
+
+Kurulumdan sonra `curl -I http://SUNUCU_IP` (henüz nginx'te site tanımlı
+olmadığı için 404/502 dönebilir, önemli olan bağlantının reddedilmemesi)
+ile iki katmanlı güvenlik duvarının gerçekten açık olduğunu doğrulayabilirsin.
 
 ## 4. Kodu getir ve kur
 
@@ -79,6 +106,11 @@ python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt -r requirements-deploy.txt
 ```
+
+Bu bir ARM sunucu (aarch64) — çoğu paket (torch, chromadb, sentence-transformers
+dahil) önceden derlenmiş ARM wheel'leri sağlıyor, ama ilk `pip install` yine de
+bazı paketleri kaynaktan derlemek zorunda kalırsa normalden (birkaç dakika)
+uzun sürebilir. Hata almadan bitmesi yeterli, süresi önemli değil.
 
 ## 5. `.env` dosyası (gerçek sırlarla, gitignore'lu)
 
@@ -167,11 +199,12 @@ sudo systemctl restart academic-chatbot
 
 ## Kalıcılık ve bilinen sınırlamalar
 
-- `conversations.db`, `demo_okul.db`, `chroma_db/`, `uploads/` droplet'in kendi
-  diskinde yaşıyor — Render/Railway gibi PaaS'ların aksine deploy/restart'ta
-  silinmez. Yine de düzenli **yedek** almak istersen: `scp` ile bu dosyaları
-  periyodik indir ya da bir cron ile DO Spaces'e yükle (bu rehberin kapsamı
-  dışında).
+- `conversations.db`, `demo_okul.db`, `chroma_db/`, `uploads/` sunucunun kendi
+  diskinde (Always Free ile gelen 200 GB blok depolamanın içinde) yaşıyor —
+  Render/Railway gibi PaaS'ların aksine deploy/restart'ta silinmez. Yine de
+  düzenli **yedek** almak istersen: `scp` ile bu dosyaları periyodik indir ya
+  da bir cron ile Oracle Object Storage'a yükle (Always Free'de 20 GB dahil;
+  bu rehberin kapsamı dışında).
 - `academic-chatbot.service`'te bilerek **tek gunicorn worker** kullanılıyor:
   uygulamanın paylaşılan durumu (`core/state.py::AppState` — sohbetler, günlük
   bütçe sayacı) process-içi bellekte tutuluyor; birden fazla worker açılırsa her
